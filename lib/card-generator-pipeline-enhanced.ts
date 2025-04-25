@@ -45,6 +45,19 @@ export function generateCardJSON(isBranded = false): Card {
     social_trigger: 'Si alguien llora, todos gritan "¡Salud!"',
     back_image_url: "/placeholder.svg?height=400&width=300&text=Card+Back",
   }
-
+,  { card_title: isBranded ? "Reto Patrocinado" : "Reto Despecho",
+    challenge: "Describe tu peor experiencia de despecho en 50 segundos.",
+    emotional_tier: "mild",
+    theme_tag: "ghosting",
+    spotify_song: {
+      title: "titi",
+      artist: "bad bunny",
+    },
+    sticker: "Corazón Roto",
+    reward: "Un beso grupal",
+    reward_type: "product",
+    social_trigger: 'Si alguien llora, todos lloran"¡Salud!"',
+    back_image_url: "/placeholder.svg?height=400&width=300&text=Card+Back",
+  }
   return card
 }
