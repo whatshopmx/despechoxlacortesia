@@ -1,5 +1,6 @@
 /**
  * Enhanced Card Generator Pipeline with Card Library
+ * Includes support for both branded and non-branded cards
  */
 
 // Original Card interface
@@ -26,6 +27,15 @@ export interface Card {
   back_image_url?: string
 }
 
+// Brand sponsor interface
+export interface BrandSponsor {
+  id: string
+  name: string
+  logo: string
+  industry: string
+  rewardValue: number
+}
+
 // Template interface based on your source document
 export interface CardTemplate {
   nombre: string
@@ -45,7 +55,42 @@ export interface CardTemplate {
     efecto: string
     recompensa: string
   }
+  brandable: boolean  // Flag to indicate if this template can be branded
+  brand_mecanica?: string  // Alternative mechanic text for branded version
+  brand_recompensa?: string  // Alternative reward for branded version
 }
+
+// Available brands for sponsorship
+export const availableBrands: BrandSponsor[] = [
+  {
+    id: "corona",
+    name: "Corona",
+    logo: "/brands/corona.svg",
+    industry: "bebidas",
+    rewardValue: 15
+  },
+  {
+    id: "spotify",
+    name: "Spotify",
+    logo: "/brands/spotify.svg",
+    industry: "entretenimiento",
+    rewardValue: 10
+  },
+  {
+    id: "sephora",
+    name: "Sephora",
+    logo: "/brands/sephora.svg",
+    industry: "belleza",
+    rewardValue: 20
+  },
+  {
+    id: "uber",
+    name: "Uber",
+    logo: "/brands/uber.svg",
+    industry: "transporte",
+    rewardValue: 25
+  }
+];
 
 // Library of card templates
 export const cardTemplateLibrary: CardTemplate[] = [
@@ -66,7 +111,10 @@ export const cardTemplateLibrary: CardTemplate[] = [
       momento: "Ronda de confesiones",
       efecto: "AI añade un premio y descripción tipo 'Y el Oscar a \"Creer que era diferente\" va para…'",
       recompensa: "Estatuilla virtual de 'Mejor Autoengaño'"
-    }
+    },
+    brandable: true,
+    brand_mecanica: "Cuenta una historia donde pensaste que una marca era mejor que [MARCA_PATROCINADOR]",
+    brand_recompensa: "Descuento en [MARCA_PATROCINADOR]"
   },
   {
     nombre: "TikTok Therapy",
@@ -85,7 +133,10 @@ export const cardTemplateLibrary: CardTemplate[] = [
       momento: "Hora de compartir consejos",
       efecto: "AI responde con 'teoría psicológica dudosa pero viral'",
       recompensa: "Certificado: 'Influencer de Desamor'"
-    }
+    },
+    brandable: true,
+    brand_mecanica: "Promociona [MARCA_PATROCINADOR] como si fueras influencer que encubre anuncio pagado",
+    brand_recompensa: "Descuento en [MARCA_PATROCINADOR] por convertirte en su embajador"
   },
   {
     nombre: "Casting para tu Ex",
@@ -104,7 +155,8 @@ export const cardTemplateLibrary: CardTemplate[] = [
       momento: "Momento creativo grupal",
       efecto: "AI te da el tráiler de la película basada en su relación",
       recompensa: "Póster digital de tu 'película'"
-    }
+    },
+    brandable: false
   },
   {
     nombre: "Reacción de tu Abuelita",
@@ -123,7 +175,8 @@ export const cardTemplateLibrary: CardTemplate[] = [
       momento: "Después de compartir una historia triste",
       efecto: "AI reescribe tu historia como si fuera un sermón de telenovela",
       recompensa: "Recetario virtual: 'Sopas para el Alma Rota'"
-    }
+    },
+    brandable: false
   },
   {
     nombre: "Lo que no posteaste",
@@ -142,7 +195,10 @@ export const cardTemplateLibrary: CardTemplate[] = [
       momento: "Ronda de verdades ocultas",
       efecto: "AI la convierte en un post viral alternativo con caption",
       recompensa: "Filtro: 'Reality Check'"
-    }
+    },
+    brandable: true,
+    brand_mecanica: "Confiesa una experiencia relacionada con [MARCA_PATROCINADOR] que nunca compartiste",
+    brand_recompensa: "Descuento exclusivo en [MARCA_PATROCINADOR]"
   },
   {
     nombre: "Tu Villano Origin Story",
@@ -161,7 +217,8 @@ export const cardTemplateLibrary: CardTemplate[] = [
       momento: "Confesiones de momentos bajos",
       efecto: "AI narra tu transformación en tono Marvel oscuro",
       recompensa: "Logo de supervillano personalizado"
-    }
+    },
+    brandable: false
   },
   {
     nombre: "Notas del Universo",
@@ -180,7 +237,10 @@ export const cardTemplateLibrary: CardTemplate[] = [
       momento: "Momento de introspección",
       efecto: "AI lo convierte en un mensaje cósmico poético tipo oráculo",
       recompensa: "Carta de tarot personalizada"
-    }
+    },
+    brandable: true,
+    brand_mecanica: "Describe una señal del universo que te llevó a descubrir [MARCA_PATROCINADOR]",
+    brand_recompensa: "Experiencia exclusiva con [MARCA_PATROCINADOR]"
   }
 ];
 
@@ -200,15 +260,53 @@ function getEmotionalTier(tones: string[]): "mild" | "intense" | "chaotic" {
 }
 
 /**
+ * Get a random brand sponsor
+ */
+function getRandomBrandSponsor(): BrandSponsor {
+  const randomIndex = Math.floor(Math.random() * availableBrands.length);
+  return availableBrands[randomIndex];
+}
+
+/**
  * Convert a template to a card
  */
-export function templateToCard(template: CardTemplate, isBranded = false): Card {
+export function templateToCard(template: CardTemplate, options: {
+  isBranded?: boolean,
+  brandSponsor?: BrandSponsor
+} = {}): Card {
   // Extract song information
   const songInfo = template.referencias.cancion_sugerida.split(" - ");
   
-  return {
-    card_title: isBranded ? `Reto Patrocinado: ${template.nombre}` : template.nombre,
-    challenge: template.mecanica,
+  // Determine if card should be branded
+  const shouldBrand = options.isBranded && template.brandable;
+  
+  // Get brand sponsor if needed
+  const brandSponsor = shouldBrand ? (options.brandSponsor || getRandomBrandSponsor()) : undefined;
+  
+  // Prepare card contents based on branding status
+  let challenge = template.mecanica;
+  let reward = template.uso_en_juego.recompensa;
+  let cardTitle = template.nombre;
+  
+  // Apply brand-specific content if applicable
+  if (shouldBrand && brandSponsor) {
+    cardTitle = `Reto ${brandSponsor.name}: ${template.nombre}`;
+    
+    // Use brand-specific mechanic if available
+    if (template.brand_mecanica) {
+      challenge = template.brand_mecanica.replace("[MARCA_PATROCINADOR]", brandSponsor.name);
+    }
+    
+    // Use brand-specific reward if available
+    if (template.brand_recompensa) {
+      reward = template.brand_recompensa.replace("[MARCA_PATROCINADOR]", brandSponsor.name);
+    }
+  }
+  
+  // Create the card
+  const card: Card = {
+    card_title: cardTitle,
+    challenge: challenge,
     emotional_tier: getEmotionalTier(template.tono),
     theme_tag: template.subtipo[0].toLowerCase(),
     spotify_song: {
@@ -216,13 +314,21 @@ export function templateToCard(template: CardTemplate, isBranded = false): Card 
       artist: songInfo[0] || "",
     },
     sticker: template.uso_en_juego.recompensa.replace(/virtual|personalizada|personalizado|digital/g, "").trim(),
-    reward: template.uso_en_juego.recompensa,
-    reward_type: template.uso_en_juego.recompensa.includes("digital") || 
-                template.uso_en_juego.recompensa.includes("virtual") ? 
+    reward: reward,
+    reward_type: shouldBrand ? "discount" : 
+                (template.uso_en_juego.recompensa.includes("digital") || 
+                template.uso_en_juego.recompensa.includes("virtual")) ? 
                 "product" : "zerosum_card",
     social_trigger: template.uso_en_juego.efecto,
     back_image_url: "/placeholder.svg?height=400&width=300&text=" + encodeURIComponent(template.nombre),
   };
+  
+  // Add brand sponsor information if applicable
+  if (shouldBrand && brandSponsor) {
+    card.brand_sponsor = brandSponsor;
+  }
+  
+  return card;
 }
 
 /**
@@ -233,47 +339,89 @@ export function generateCardFromLibrary(options: {
   tipo?: string,
   subtipo?: string,
   tono?: string,
-  isBranded?: boolean
+  isBranded?: boolean,
+  brandId?: string,
+  onlyBrandable?: boolean
 } = {}): Card {
   let selectedTemplate: CardTemplate;
   
-  // If index is provided, use that template
+  // Prepare filtered templates
+  let filteredTemplates = [...cardTemplateLibrary];
+  
+  // Filter by brandable flag if requested
+  if (options.onlyBrandable) {
+    filteredTemplates = filteredTemplates.filter(template => template.brandable);
+  }
+  
+  // Filter by type if provided
+  if (options.tipo) {
+    filteredTemplates = filteredTemplates.filter(
+      template => template.tipo.includes(options.tipo)
+    );
+  }
+  
+  // Filter by subtype if provided
+  if (options.subtipo) {
+    filteredTemplates = filteredTemplates.filter(
+      template => template.subtipo.includes(options.subtipo)
+    );
+  }
+  
+  // Filter by tone if provided
+  if (options.tono) {
+    filteredTemplates = filteredTemplates.filter(
+      template => template.tono.includes(options.tono)
+    );
+  }
+  
+  // If no templates match criteria, use full library
+  if (filteredTemplates.length === 0) {
+    filteredTemplates = options.onlyBrandable ? 
+      cardTemplateLibrary.filter(template => template.brandable) : 
+      cardTemplateLibrary;
+  }
+  
+  // If specific index is provided and valid, use that template
   if (options.templateIndex !== undefined && options.templateIndex < cardTemplateLibrary.length) {
     selectedTemplate = cardTemplateLibrary[options.templateIndex];
-  } 
-  // Otherwise filter based on criteria
-  else {
-    let filteredTemplates = [...cardTemplateLibrary];
     
-    if (options.tipo) {
-      filteredTemplates = filteredTemplates.filter(
-        template => template.tipo.includes(options.tipo)
-      );
+    // Check if template is brandable if branding was requested
+    if (options.isBranded && !selectedTemplate.brandable) {
+      console.warn(`Template at index ${options.templateIndex} cannot be branded. Using as regular card.`);
     }
-    
-    if (options.subtipo) {
-      filteredTemplates = filteredTemplates.filter(
-        template => template.subtipo.includes(options.subtipo)
-      );
-    }
-    
-    if (options.tono) {
-      filteredTemplates = filteredTemplates.filter(
-        template => template.tono.includes(options.tono)
-      );
-    }
-    
-    // If no templates match criteria, use a random one
-    if (filteredTemplates.length === 0) {
-      filteredTemplates = cardTemplateLibrary;
-    }
-    
+  } else {
     // Select a random template from filtered list
     const randomIndex = Math.floor(Math.random() * filteredTemplates.length);
     selectedTemplate = filteredTemplates[randomIndex];
   }
   
-  return templateToCard(selectedTemplate, options.isBranded || false);
+  // Find specific brand if brand ID is provided
+  let brandSponsor: BrandSponsor | undefined;
+  if (options.brandId) {
+    brandSponsor = availableBrands.find(brand => brand.id === options.brandId);
+  }
+  
+  // Convert template to card
+  return templateToCard(selectedTemplate, {
+    isBranded: options.isBranded || false,
+    brandSponsor: brandSponsor
+  });
+}
+
+/**
+ * Generate branded cards only
+ */
+export function generateBrandedCard(options: {
+  brandId?: string,
+  tipo?: string,
+  subtipo?: string,
+  tono?: string
+} = {}): Card {
+  return generateCardFromLibrary({
+    ...options,
+    isBranded: true,
+    onlyBrandable: true
+  });
 }
 
 /**
@@ -281,7 +429,10 @@ export function generateCardFromLibrary(options: {
  */
 export function generateCardJSON(isBranded = false): Card {
   if (cardTemplateLibrary.length > 0) {
-    return generateCardFromLibrary({ isBranded });
+    return generateCardFromLibrary({ 
+      isBranded, 
+      onlyBrandable: isBranded 
+    });
   }
   
   // Fallback to original implementation if library is empty
@@ -301,10 +452,19 @@ export function generateCardJSON(isBranded = false): Card {
     back_image_url: "/placeholder.svg?height=400&width=300&text=Card+Back",
   };
   
+  // Add brand sponsor if needed
+  if (isBranded) {
+    const brandSponsor = getRandomBrandSponsor();
+    card.card_title = `Reto ${brandSponsor.name}`;
+    card.reward = `Descuento en ${brandSponsor.name}`;
+    card.reward_type = "discount";
+    card.brand_sponsor = brandSponsor;
+  }
+  
   return card;
 }
 
 // Example usage
 // const randomCard = generateCardFromLibrary();
+// const brandedCard = generateBrandedCard({ brandId: "spotify" });
 // const roleplayCard = generateCardFromLibrary({ tipo: "Roleplay" });
-// const brandedCard = generateCardFromLibrary({ isBranded: true });
