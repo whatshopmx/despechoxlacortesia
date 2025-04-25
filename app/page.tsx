@@ -36,7 +36,7 @@ export default function HomePage() {
               </div>
               <div className="flex flex-col gap-2 min-[400px]:flex-row">
                 <Button size="lg" asChild>
-                  <Link href="/experience??brand=spotify&campaign=spotify-premium2025&venue=venue-003">
+                  <Link href="/experience?brand=spotify&campaign=spotify-premium2025&venue=venue-003">
                     <Sparkles className="mr-2 h-4 w-4" />
                     Ver Demo
                   </Link>
