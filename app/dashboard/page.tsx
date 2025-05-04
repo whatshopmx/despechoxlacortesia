@@ -1,7 +1,9 @@
 import type React from "react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { BarChart3, Users, QrCode, TrendingUp, Calendar } from "lucide-react"
+import { BarChart3, Users, QrCode, TrendingUp, Calendar, SparklesIcon } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import Link from "next/link"
 
 export default function DashboardPage() {
   return (
@@ -64,6 +66,24 @@ export default function DashboardPage() {
                 <div className="text-2xl font-bold">432</div>
                 <p className="text-xs text-muted-foreground">+24% from last month</p>
               </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Card Preview Generator</CardTitle>
+                <div className="h-4 w-4 text-muted-foreground">
+                  <SparklesIcon className="h-4 w-4" />
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">Brinda X</div>
+                <p className="text-xs text-muted-foreground">Preview and generate emotional cards</p>
+              </CardContent>
+              <CardFooter>
+                <Link href="/dashboard/card-preview" className="w-full">
+                  <Button className="w-full">Open Generator</Button>
+                </Link>
+              </CardFooter>
             </Card>
           </div>
 

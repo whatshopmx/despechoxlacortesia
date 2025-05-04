@@ -1,13 +1,15 @@
 import type React from "react"
-import "@/app/globals.css"
+import "./globals.css"
+import type { Metadata } from "next"
 import { Inter } from "next/font/google"
 import { ThemeProvider } from "@/components/theme-provider"
+import { ChallengeProvider } from "@/contexts/challenge-context"
 
 const inter = Inter({ subsets: ["latin"] })
 
-export const metadata = {
+export const metadata: Metadata = {
   title: "La Cortesía MVP",
-  description: "Experiencias de marca que conectan con las emociones de tus clientes",
+  description: "La Cortesía - Experiencia emocional gamificada",
     generator: 'v0.dev'
 }
 
@@ -17,10 +19,10 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="es" suppressHydrationWarning>
+    <html lang="en">
       <body className={inter.className}>
-        <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
-          {children}
+        <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
+          <ChallengeProvider>{children}</ChallengeProvider>
         </ThemeProvider>
       </body>
     </html>
