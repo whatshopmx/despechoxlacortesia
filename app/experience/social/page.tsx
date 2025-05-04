@@ -6,8 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { ArrowLeft, Users } from "lucide-react"
 import Link from "next/link"
-import { generateBrindaCard } from "@/lib/card-generator-pipeline-enhanced"
-import { CoreEmotion, EmotionalIntensity } from "@/lib/brinda-emotional-engine"
+import { getRandomCard } from "@/lib/card-models"
 
 export default function SocialExperiencePage() {
   const [sessionStarted, setSessionStarted] = useState(false)
@@ -15,12 +14,7 @@ export default function SocialExperiencePage() {
   const [brandLogo, setBrandLogo] = useState("/placeholder.svg?height=40&width=40&text=DJ")
 
   // Generar una carta para la experiencia
-  const card = generateBrindaCard({
-    emotion: CoreEmotion.DESPECHO,
-    intensity: EmotionalIntensity.MEDIUM,
-    isBranded: true,
-    brandId: "Don Julio",
-  })
+  const card = getRandomCard()
 
   const handleChallengeComplete = () => {
     console.log("Reto completado")

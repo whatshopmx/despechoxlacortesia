@@ -23,9 +23,14 @@ import {
   Laugh,
   Smile,
   CheckCircle,
+  Music,
+  Sparkles,
+  HelpCircle,
 } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
-import type { Card as CardType } from "@/lib/card-generator-pipeline-enhanced"
+import { getRandomCard } from "@/lib/card-models"
+import type { EmotionalCardModel, StickerType } from "@/lib/card-models"
+import { AiSuggestion } from "@/components/ai-suggestion"
 
 // Tipos para los participantes y mensajes
 interface Participant {
@@ -34,7 +39,7 @@ interface Participant {
   avatar: string
   isActive: boolean
   emotionalIntensity: number
-  stickers: string[]
+  stickers: StickerType[]
   completedChallenges: number
 }
 
@@ -60,14 +65,14 @@ interface ChallengeActivity {
   participantId: string
   participantName: string
   participantAvatar: string
-  card: CardType
+  card: EmotionalCardModel
   completed: boolean
   reactions: Reaction[]
   timestamp: Date
 }
 
 interface ExperienceSessionProps {
-  initialCard?: CardType
+  initialCard?: EmotionalCardModel
   onChallengeComplete?: () => void
   brandName?: string
   brandLogo?: string
@@ -87,7 +92,7 @@ export function ExperienceSession({
       avatar: "/placeholder.svg?height=40&width=40&text=Tú",
       isActive: true,
       emotionalIntensity: 30,
-      stickers: ["Corazón Roto"],
+      stickers: ["💔 Corazón Roto™"],
       completedChallenges: 2,
     },
     {
@@ -96,7 +101,7 @@ export function ExperienceSession({
       avatar: "/placeholder.svg?height=40&width=40&text=C",
       isActive: false,
       emotionalIntensity: 45,
-      stickers: ["Tears de Oro", "Friendzone Champion"],
+      stickers: ["🤡 Payaso Oficial", "🧸 Chicle Emocional"],
       completedChallenges: 3,
     },
     {
@@ -105,7 +110,7 @@ export function ExperienceSession({
       avatar: "/placeholder.svg?height=40&width=40&text=D",
       isActive: false,
       emotionalIntensity: 60,
-      stickers: ["Voz de Borrachx", "Petty Pro"],
+      stickers: ["🎤 Voz de Telenovela", "🧨 Causa Caos"],
       completedChallenges: 5,
     },
     {
@@ -114,7 +119,7 @@ export function ExperienceSession({
       avatar: "/placeholder.svg?height=40&width=40&text=M",
       isActive: false,
       emotionalIntensity: 25,
-      stickers: ["Micrófono Ardido"],
+      stickers: ["💬 Texto Mal Mandado"],
       completedChallenges: 1,
     },
   ])
@@ -157,7 +162,7 @@ export function ExperienceSession({
   const [currentTurn, setCurrentTurn] = useState(0)
 
   // Estado para el reto actual
-  const [currentCard, setCurrentCard] = useState<CardType | null>(initialCard || null)
+  const [currentCard, setCurrentCard] = useState<EmotionalCardModel | null>(initialCard || null)
 
   // Estado para el temporizador
   const [timer, setTimer] = useState(60)
@@ -173,6 +178,18 @@ export function ExperienceSession({
 
   // Estado para el resultado (éxito o fracaso)
   const [challengeSuccess, setChallengeSuccess] = useState(false)
+
+  // Estado para mostrar combos de stickers
+  const [showCombo, setShowCombo] = useState(false)
+
+  // Estado para el combo activo
+  const [activeCombo, setActiveCombo] = useState<string | null>(null)
+
+  // Estado para notificaciones
+  const [notifications, setNotifications] = useState<string[]>([])
+
+  // Estado para mostrar la sugerencia de IA
+  const [showAiSuggestion, setShowAiSuggestion] = useState(false)
 
   // Efecto para simular el temporizador
   useEffect(() => {
@@ -224,6 +241,9 @@ export function ExperienceSession({
       }
 
       setChatMessages((prev) => [...prev, responseMessage])
+
+      // Añadir notificación
+      addNotification(`${randomParticipant.name} ha respondido a tu mensaje`)
     }, 2000)
   }
 
@@ -234,6 +254,9 @@ export function ExperienceSession({
     // Mostrar la verificación
     setShowVerification(true)
 
+    // Añadir notificación
+    addNotification("¡Has completado el reto! Espera a que los demás verifiquen.")
+
     // Simular votos automáticos después de un tiempo
     setTimeout(() => {
       const simulatedVotes: Record<string, boolean> = {}
@@ -241,6 +264,9 @@ export function ExperienceSession({
         if (p.id !== "user") {
           // 80% de probabilidad de voto positivo
           simulatedVotes[p.id] = Math.random() > 0.2
+
+          // Añadir notificación de voto
+          addNotification(`${p.name} ha ${simulatedVotes[p.id] ? "aprobado" : "rechazado"} tu reto`)
         }
       })
       setVerificationVotes(simulatedVotes)
@@ -283,10 +309,26 @@ export function ExperienceSession({
         setParticipants((prev) =>
           prev.map((p) => {
             if (p.id === participants[currentTurn].id) {
+              // Añadir un sticker basado en la carta
+              const newStickers = [...p.stickers]
+              if (currentCard.sticker_integration) {
+                const stickerMatch = currentCard.sticker_integration.match(/Ganas el sticker (.*?) si/)
+                if (stickerMatch && stickerMatch[1]) {
+                  newStickers.push(stickerMatch[1] as StickerType)
+
+                  // Añadir notificación de sticker
+                  addNotification(`¡Has ganado el sticker ${stickerMatch[1]}!`)
+
+                  // Verificar si se activa un combo
+                  checkForCombos(newStickers)
+                }
+              }
+
               return {
                 ...p,
                 emotionalIntensity: Math.min(100, p.emotionalIntensity + 15),
                 completedChallenges: p.completedChallenges + 1,
+                stickers: newStickers,
               }
             }
             return p
@@ -305,6 +347,36 @@ export function ExperienceSession({
         nextTurn()
       }, 3000)
     }, 1000)
+  }
+
+  // Función para verificar combos de stickers
+  const checkForCombos = (stickers: StickerType[]) => {
+    // Verificar combos predefinidos
+    if (
+      stickers.includes("🎤 Voz de Telenovela") &&
+      stickers.includes("💃 Vergüenza Ajena") &&
+      stickers.includes("🤡 Payaso Oficial")
+    ) {
+      setActiveCombo("Karaoke Caótico")
+      setShowCombo(true)
+      addNotification("¡Has activado el combo Karaoke Caótico!")
+    } else if (
+      stickers.includes("🤡 Payaso Oficial") &&
+      stickers.includes("🧨 Causa Caos") &&
+      stickers.includes("🚩 Red Flag Flag")
+    ) {
+      setActiveCombo("Cerebro Apagado")
+      setShowCombo(true)
+      addNotification("¡Has activado el combo Cerebro Apagado!")
+    } else if (
+      stickers.includes("💬 Texto Mal Mandado") &&
+      stickers.includes("🤡 Payaso Oficial") &&
+      stickers.includes("💔 Corazón Roto™")
+    ) {
+      setActiveCombo("Barra Libre de Excusas")
+      setShowCombo(true)
+      addNotification("¡Has activado el combo Barra Libre de Excusas!")
+    }
   }
 
   // Función para pasar al siguiente turno
@@ -326,7 +398,12 @@ export function ExperienceSession({
     // Simular un nuevo reto
     if (initialCard) {
       setCurrentCard(initialCard)
+    } else {
+      setCurrentCard(getRandomCard())
     }
+
+    // Añadir notificación
+    addNotification(`Ahora es el turno de ${participants[nextTurnIndex].name}`)
   }
 
   // Función para añadir una reacción a una actividad
@@ -349,6 +426,11 @@ export function ExperienceSession({
         }
         return activity
       }),
+    )
+
+    // Añadir notificación
+    addNotification(
+      `Has reaccionado a la actividad de ${activityFeed.find((a) => a.id === activityId)?.participantName}`,
     )
 
     // Simular reacciones de otros participantes
@@ -382,6 +464,9 @@ export function ExperienceSession({
           return activity
         }),
       )
+
+      // Añadir notificación
+      addNotification(`${randomParticipant.name} también ha reaccionado`)
     }, 1500)
   }
 
@@ -417,6 +502,16 @@ export function ExperienceSession({
     }
   }
 
+  // Función para añadir notificaciones
+  const addNotification = (message: string) => {
+    setNotifications((prev) => [message, ...prev].slice(0, 5))
+
+    // Auto-eliminar después de 5 segundos
+    setTimeout(() => {
+      setNotifications((prev) => prev.filter((n) => n !== message))
+    }, 5000)
+  }
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
       {/* Panel izquierdo: Participantes y chat */}
@@ -440,6 +535,25 @@ export function ExperienceSession({
             <CardDescription>Sesión de experiencia emocional</CardDescription>
           </CardHeader>
         </Card>
+
+        {/* Notificaciones */}
+        {notifications.length > 0 && (
+          <div className="space-y-2">
+            <AnimatePresence>
+              {notifications.map((notification, index) => (
+                <motion.div
+                  key={`${notification}-${index}`}
+                  initial={{ opacity: 0, y: -20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, x: 100 }}
+                  className="bg-primary/10 p-2 rounded-md text-sm"
+                >
+                  {notification}
+                </motion.div>
+              ))}
+            </AnimatePresence>
+          </div>
+        )}
 
         {/* Participantes */}
         <Card>
@@ -574,9 +688,21 @@ export function ExperienceSession({
               <div className="w-full">
                 <EmotionalCard card={currentCard} hideButton={true} />
                 {participants[currentTurn].id === "user" && (
-                  <Button className="w-full mt-4" onClick={completeChallenge}>
-                    He Completado el Reto
-                  </Button>
+                  <div className="flex flex-col gap-2 mt-4">
+                    {currentCard?.ai_backup_response && (
+                      <Button
+                        variant="outline"
+                        className="w-full flex items-center justify-center gap-2 border-dashed"
+                        onClick={() => setShowAiSuggestion(true)}
+                      >
+                        <HelpCircle className="h-4 w-4" />
+                        <span>No sé qué hacer... ¡Ayúdame!</span>
+                      </Button>
+                    )}
+                    <Button className="w-full" onClick={completeChallenge}>
+                      He Completado el Reto
+                    </Button>
+                  </div>
                 )}
               </div>
             ) : (
@@ -640,6 +766,15 @@ export function ExperienceSession({
                           <CardContent className="pb-2">
                             <div className="text-sm font-medium mb-1">{activity.card.card_title}</div>
                             <div className="text-xs text-muted-foreground">{activity.card.challenge}</div>
+
+                            {activity.card.spotify_song && (
+                              <div className="flex items-center gap-2 mt-2 text-xs text-gray-500">
+                                <Music className="h-3 w-3" />
+                                <span>
+                                  {activity.card.spotify_song.title} - {activity.card.spotify_song.artist}
+                                </span>
+                              </div>
+                            )}
                           </CardContent>
                           <CardFooter className="pt-2 flex justify-between border-t">
                             <div className="flex items-center gap-1">
@@ -836,6 +971,74 @@ export function ExperienceSession({
         </div>
       )}
 
+      {/* Modal de combo de stickers */}
+      {showCombo && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <Card className="w-full max-w-md">
+            <CardHeader className="bg-gradient-to-r from-amber-500 to-pink-500 text-white">
+              <CardTitle className="flex items-center">
+                <Sparkles className="h-5 w-5 mr-2" />
+                ¡Combo de Stickers Activado!
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-6">
+              <div className="flex flex-col items-center">
+                <div className="flex gap-2 mb-4">
+                  {activeCombo === "Karaoke Caótico" && (
+                    <>
+                      <Badge className="text-lg">🎤</Badge>
+                      <Badge className="text-lg">💃</Badge>
+                      <Badge className="text-lg">🤡</Badge>
+                    </>
+                  )}
+                  {activeCombo === "Cerebro Apagado" && (
+                    <>
+                      <Badge className="text-lg">🤡</Badge>
+                      <Badge className="text-lg">🧨</Badge>
+                      <Badge className="text-lg">🚩</Badge>
+                    </>
+                  )}
+                  {activeCombo === "Barra Libre de Excusas" && (
+                    <>
+                      <Badge className="text-lg">💬</Badge>
+                      <Badge className="text-lg">🤡</Badge>
+                      <Badge className="text-lg">💔</Badge>
+                    </>
+                  )}
+                </div>
+                <h3 className="text-xl font-bold mb-2">{activeCombo}</h3>
+                <p className="text-center mb-4">
+                  {activeCombo === "Karaoke Caótico" &&
+                    "Todos deben cantar 'Hawái' de Maluma con voz operática y coreografía ridícula. La persona con peor interpretación recibe el sticker 'Payaso Oficial' adicional."}
+                  {activeCombo === "Cerebro Apagado" && "El grupo habla solo con emojis durante una ronda."}
+                  {activeCombo === "Barra Libre de Excusas" &&
+                    "Todos inventan excusas absurdas para no contestar un chat (ej.: 'Estaba meditando con delfines')."}
+                </p>
+                <div className="bg-amber-50 p-4 rounded-lg w-full">
+                  <h4 className="font-medium flex items-center">
+                    <Award className="h-5 w-5 text-amber-500 mr-2" />
+                    Premio:
+                  </h4>
+                  <p className="mt-1">
+                    {activeCombo === "Karaoke Caótico" &&
+                      "Playlist 'Soundtrack de mi Ex' + filtro AR de coro de fantasmas cantando '¿Ya viste que subió una story?'"}
+                    {activeCombo === "Cerebro Apagado" &&
+                      "Badge 'Emoji Master' + derecho a forzar a otro jugador a hablar solo con emojis por una ronda adicional."}
+                    {activeCombo === "Barra Libre de Excusas" &&
+                      "Generador de excusas premium + certificado 'Maestro de la Evasión Emocional'."}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+            <CardFooter>
+              <Button onClick={() => setShowCombo(false)} className="w-full">
+                ¡Activar Combo!
+              </Button>
+            </CardFooter>
+          </Card>
+        </div>
+      )}
+
       {/* Confetti para celebración */}
       {challengeSuccess && showResult && (
         <div className="fixed inset-0 pointer-events-none z-50">
@@ -874,6 +1077,15 @@ export function ExperienceSession({
             })}
           </AnimatePresence>
         </div>
+      )}
+
+      {/* Sugerencia de IA */}
+      {showAiSuggestion && currentCard?.ai_backup_response && (
+        <AiSuggestion
+          narrativeVoice={currentCard.narrative_voice || "La IA del Despecho"}
+          suggestion={currentCard.ai_backup_response}
+          onClose={() => setShowAiSuggestion(false)}
+        />
       )}
     </div>
   )
