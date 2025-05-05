@@ -139,6 +139,46 @@ export const BRAND_CAMPAIGNS: BrandCampaign[] = [
     targetAudience: ["21-40", "urban dwellers", "nightlife"],
     active: true,
   },
+  // Nueva campaña para Tecate
+  {
+    id: "tecate-summer2025",
+    brandId: "tecate",
+    brandName: "Tecate",
+    logo: "/placeholder.svg?height=60&width=120&text=Tecate",
+    primaryColor: "#D31245", // Rojo Tecate
+    secondaryColor: "#FFFFFF",
+    startDate: "2025-05-01",
+    endDate: "2025-09-30",
+    title: "Tecate Despecho Fest",
+    description:
+      "Experiencia Despecho x La Cortesía patrocinada por Tecate. Completa retos y gana cervezas o mercancía exclusiva.",
+    venues: [
+      {
+        id: "venue-005",
+        name: "Bar El Depósito",
+        address: "Av. Chapultepec 500",
+        city: "CDMX",
+        qrCode: "/placeholder.svg?height=200&width=200&text=QR+Tecate+El+Deposito",
+        shortLink: "cort.es/tecate-deposito",
+      },
+      {
+        id: "venue-006",
+        name: "Foro Tecate",
+        address: "Calle Reforma 789",
+        city: "CDMX",
+        qrCode: "/placeholder.svg?height=200&width=200&text=QR+Tecate+Foro",
+        shortLink: "cort.es/tecate-foro",
+      },
+    ],
+    cardThemes: ["breakup", "drunk_text", "ex_encounter", "rebound"],
+    challengeTypes: ["karaoke", "confession", "truth_or_dare", "group_challenge"],
+    emotionalTiers: ["mild", "intense", "chaotic"],
+    rewardValue: 120,
+    rewardType: "product",
+    rewardDescription: "Cerveza Tecate o mercancía exclusiva",
+    targetAudience: ["21-45", "beer lovers", "music festival attendees", "nightlife"],
+    active: true,
+  },
 ]
 
 /**

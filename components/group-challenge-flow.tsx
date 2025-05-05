@@ -449,12 +449,16 @@ export function GroupChallengeFlow({ initialPlayers, cards, brandInfo, onComplet
       // Calculate new tier
       const tier = calculateTier(completedCards.length, emotionalScore)
 
+      // Remove the completed card from assignedCards
+      const remainingCards = player.assignedCards.filter((card) => card.card_id !== currentCard?.card_id)
+
       // Update the player
       updatedPlayers[currentPlayerIndex] = {
         ...player,
         completedCards,
         emotionalScore,
         tier,
+        assignedCards: remainingCards, // Actualizar con las cartas restantes
       }
 
       return updatedPlayers

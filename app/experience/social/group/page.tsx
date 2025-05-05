@@ -95,7 +95,7 @@ export default function GroupExperiencePage() {
       completedCards: [],
       emotionalScore: 0,
       currentTurn: true,
-      assignedCards: [sampleCards[0]],
+      assignedCards: [sampleCards[0], sampleCards[1]], // Asignar múltiples cartas
     },
   ])
   const [newPlayerName, setNewPlayerName] = useState("")
@@ -106,8 +106,8 @@ export default function GroupExperiencePage() {
 
     const newPlayerId = `user_${players.length + 1}`.padStart(7, "0")
 
-    // Randomly assign cards to the new player
-    const assignedCards = sampleCards.sort(() => 0.5 - Math.random()).slice(0, 2)
+    // Asignar todas las cartas disponibles al nuevo jugador
+    const assignedCards = [...sampleCards].sort(() => 0.5 - Math.random())
 
     setPlayers([
       ...players,

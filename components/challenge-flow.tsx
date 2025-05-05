@@ -6,13 +6,13 @@ import { useChallenge } from "@/contexts/challenge-context"
 import { Button } from "@/components/ui/button"
 import { EmotionalCard } from "@/components/emotional-card"
 import { Progress } from "@/components/ui/progress"
-import { Camera, Mic, CheckCircle, XCircle, Loader2, Award, AlertCircle } from "lucide-react"
+import { Camera, Mic, CheckCircle, XCircle, Loader2, Award, AlertCircle, Bot, StopCircle } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { motion, AnimatePresence } from "framer-motion"
+import { Textarea } from "@/components/ui/textarea"
 
 interface ChallengeFlowProps {
   card: Card
@@ -45,6 +45,9 @@ export function ChallengeFlow({ card, onComplete }: ChallengeFlowProps) {
   const [activeTab, setActiveTab] = useState<string>("challenge")
   const [isInitialized, setIsInitialized] = useState(false)
   const [verificationError, setVerificationError] = useState<string | null>(null)
+  const [textVerification, setTextVerification] = useState<string>("")
+  const [showAiHelp, setShowAiHelp] = useState(false)
+  const [cameraActive, setCameraActive] = useState(false)
 
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
@@ -91,8 +94,8 @@ export function ChallengeFlow({ card, onComplete }: ChallengeFlowProps) {
           setVerificationError("Error durante la auto-verificación. Por favor, intenta de nuevo.")
         })
       } else {
-        // For other verification methods, the UI will guide the user
-        setActiveTab("verify")
+        // For other verification methods, we'll show the verification UI inline
+        // No need to change tabs anymore
       }
     } catch (err) {
       console.error("Error completing challenge:", err)
@@ -107,6 +110,7 @@ export function ChallengeFlow({ card, onComplete }: ChallengeFlowProps) {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: true })
       videoRef.current.srcObject = stream
+      setCameraActive(true)
     } catch (err) {
       console.error("Error accessing camera:", err)
       // Show a user-friendly error message
@@ -137,6 +141,7 @@ export function ChallengeFlow({ card, onComplete }: ChallengeFlowProps) {
         if (video.srcObject) {
           const tracks = (video.srcObject as MediaStream).getTracks()
           tracks.forEach((track) => track.stop())
+          setCameraActive(false)
         }
       }
     } catch (err) {
@@ -226,6 +231,29 @@ export function ChallengeFlow({ card, onComplete }: ChallengeFlowProps) {
     }
   }
 
+  // Handle text verification
+  const submitTextVerification = async () => {
+    if (!textVerification.trim()) {
+      setVerificationError("Por favor, escribe algo primero.")
+      return
+    }
+
+    try {
+      // Simulate verification with text
+      const success = await verifyChallenge("self", textVerification)
+
+      if (success) {
+        setShowConfetti(true)
+        setTimeout(() => setShowConfetti(false), 3000)
+      }
+
+      setActiveTab("result")
+    } catch (err) {
+      console.error("Error submitting text verification:", err)
+      setVerificationError("Ocurrió un error al enviar la verificación. Por favor, intenta de nuevo.")
+    }
+  }
+
   // Handle group verification
   const addGroupVote = () => {
     setGroupVotes((prev) => prev + 1)
@@ -273,19 +301,19 @@ export function ChallengeFlow({ card, onComplete }: ChallengeFlowProps) {
     switch (verificationMethod) {
       case "photo":
         return (
-          <div className="space-y-4">
+          <div className="space-y-4 mt-4 bg-gray-50 p-4 rounded-lg border">
             <h3 className="text-lg font-medium">Verifica tu reto con una foto</h3>
             <p className="text-sm text-gray-500">Toma una foto que demuestre que has completado el reto.</p>
 
             <div className="relative aspect-video bg-black rounded-lg overflow-hidden">
               {!photoData ? (
-                <video
-                  ref={videoRef}
-                  autoPlay
-                  playsInline
-                  className="w-full h-full object-cover"
-                  onLoadedMetadata={() => startCamera()}
-                />
+                cameraActive ? (
+                  <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center bg-gray-800">
+                    <Camera className="h-12 w-12 text-gray-400" />
+                  </div>
+                )
               ) : (
                 <img
                   src={photoData || "/placeholder.svg"}
@@ -298,16 +326,23 @@ export function ChallengeFlow({ card, onComplete }: ChallengeFlowProps) {
 
             <div className="flex justify-center gap-4">
               {!photoData ? (
-                <Button onClick={capturePhoto}>
-                  <Camera className="mr-2 h-4 w-4" />
-                  Capturar Foto
-                </Button>
+                !cameraActive ? (
+                  <Button onClick={startCamera} className="w-full">
+                    <Camera className="mr-2 h-4 w-4" />
+                    Activar Cámara
+                  </Button>
+                ) : (
+                  <Button onClick={capturePhoto} className="w-full">
+                    <Camera className="mr-2 h-4 w-4" />
+                    Capturar Foto
+                  </Button>
+                )
               ) : (
                 <>
-                  <Button variant="outline" onClick={() => setPhotoData(null)}>
+                  <Button variant="outline" onClick={() => setPhotoData(null)} className="flex-1">
                     Volver a Capturar
                   </Button>
-                  <Button onClick={submitPhotoVerification}>
+                  <Button onClick={submitPhotoVerification} className="flex-1">
                     <CheckCircle className="mr-2 h-4 w-4" />
                     Enviar Verificación
                   </Button>
@@ -319,7 +354,7 @@ export function ChallengeFlow({ card, onComplete }: ChallengeFlowProps) {
 
       case "audio":
         return (
-          <div className="space-y-4">
+          <div className="space-y-4 mt-4 bg-gray-50 p-4 rounded-lg border">
             <h3 className="text-lg font-medium">Verifica tu reto con audio</h3>
             <p className="text-sm text-gray-500">Graba un audio que demuestre que has completado el reto.</p>
 
@@ -339,12 +374,13 @@ export function ChallengeFlow({ card, onComplete }: ChallengeFlowProps) {
 
             <div className="flex justify-center gap-4">
               {!isRecording && !audioData ? (
-                <Button onClick={startRecording}>
+                <Button onClick={startRecording} className="w-full">
                   <Mic className="mr-2 h-4 w-4" />
                   Iniciar Grabación
                 </Button>
               ) : isRecording ? (
-                <Button variant="destructive" onClick={stopRecording}>
+                <Button variant="destructive" onClick={stopRecording} className="w-full">
+                  <StopCircle className="mr-2 h-4 w-4" />
                   Detener Grabación
                 </Button>
               ) : (
@@ -355,10 +391,11 @@ export function ChallengeFlow({ card, onComplete }: ChallengeFlowProps) {
                       setAudioData(null)
                       startRecording()
                     }}
+                    className="flex-1"
                   >
                     Volver a Grabar
                   </Button>
-                  <Button onClick={submitAudioVerification}>
+                  <Button onClick={submitAudioVerification} className="flex-1">
                     <CheckCircle className="mr-2 h-4 w-4" />
                     Enviar Verificación
                   </Button>
@@ -370,13 +407,13 @@ export function ChallengeFlow({ card, onComplete }: ChallengeFlowProps) {
 
       case "group":
         return (
-          <div className="space-y-4">
+          <div className="space-y-4 mt-4 bg-gray-50 p-4 rounded-lg border">
             <h3 className="text-lg font-medium">Verificación grupal</h3>
             <p className="text-sm text-gray-500">
               Necesitas que al menos 3 personas confirmen que has completado el reto.
             </p>
 
-            <div className="bg-gray-100 p-4 rounded-lg">
+            <div className="bg-white p-4 rounded-lg border">
               <div className="flex justify-between items-center">
                 <span className="font-medium">Votos recibidos:</span>
                 <Badge variant="secondary">{groupVotes} / 3</Badge>
@@ -384,7 +421,7 @@ export function ChallengeFlow({ card, onComplete }: ChallengeFlowProps) {
               <Progress value={(groupVotes / 3) * 100} className="h-2 mt-2" />
             </div>
 
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-2 justify-center">
               {["Carlos", "Diana", "Miguel", "Laura", "Javier"].map((name, index) => (
                 <TooltipProvider key={index}>
                   <Tooltip>
@@ -412,17 +449,39 @@ export function ChallengeFlow({ card, onComplete }: ChallengeFlowProps) {
 
       default:
         return (
-          <div className="space-y-4">
-            <h3 className="text-lg font-medium">Auto-verificación</h3>
-            <p className="text-sm text-gray-500">Confirma que has completado el reto.</p>
+          <div className="space-y-4 mt-4 bg-gray-50 p-4 rounded-lg border">
+            <h3 className="text-lg font-medium">Verificación por texto</h3>
+            <p className="text-sm text-gray-500">Describe cómo completaste el reto.</p>
 
-            <Button onClick={() => verifyChallenge("self")} className="w-full">
+            <Textarea
+              placeholder="Escribe aquí cómo completaste el reto..."
+              value={textVerification}
+              onChange={(e) => setTextVerification(e.target.value)}
+              className="min-h-[100px]"
+            />
+
+            <Button onClick={submitTextVerification} className="w-full">
               <CheckCircle className="mr-2 h-4 w-4" />
-              Confirmar Reto Completado
+              Enviar Verificación
             </Button>
           </div>
         )
     }
+  }
+
+  // Render AI help
+  const renderAiHelp = () => {
+    if (!card.ai_backup_response) return null
+
+    return (
+      <div className="mt-4 bg-purple-50 border border-purple-200 rounded-lg p-4">
+        <div className="flex items-center gap-2 mb-2">
+          <Bot className="h-5 w-5 text-purple-500" />
+          <h3 className="font-medium text-purple-800">Sugerencia de IA</h3>
+        </div>
+        <p className="text-purple-700 italic">{card.ai_backup_response}</p>
+      </div>
+    )
   }
 
   // Render result UI based on challenge status
@@ -524,39 +583,33 @@ export function ChallengeFlow({ card, onComplete }: ChallengeFlowProps) {
         </Alert>
       )}
 
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="challenge">Reto</TabsTrigger>
-          <TabsTrigger value="verify" disabled={challengeStatus === "idle" || challengeStatus === "in-progress"}>
-            Verificar
-          </TabsTrigger>
-          <TabsTrigger value="result" disabled={challengeStatus !== "completed" && challengeStatus !== "failed"}>
-            Resultado
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="challenge" className="mt-4">
+      {challengeStatus === "completed" || challengeStatus === "failed" ? (
+        // Show result UI when challenge is completed or failed
+        renderResultUI()
+      ) : (
+        // Show challenge UI with integrated verification
+        <div>
           <EmotionalCard card={card} isPreview={false} hideButton={true} />
 
-          <div className="mt-4">
-            <Button onClick={handleCompleteChallenge} className="w-full" disabled={challengeStatus !== "in-progress"}>
-              {challengeStatus === "in-progress" ? (
-                <>He Completado el Reto</>
-              ) : (
-                <Loader2 className="h-4 w-4 animate-spin mr-2" />
-              )}
-            </Button>
-          </div>
-        </TabsContent>
+          {/* AI Help/Suggestion */}
+          {card.ai_backup_response && renderAiHelp()}
 
-        <TabsContent value="verify" className="mt-4">
-          {renderVerificationUI()}
-        </TabsContent>
-
-        <TabsContent value="result" className="mt-4">
-          {renderResultUI()}
-        </TabsContent>
-      </Tabs>
+          {/* Verification UI integrated directly under the card */}
+          {challengeStatus === "verifying" ? (
+            renderVerificationUI()
+          ) : (
+            <div className="mt-4">
+              <Button onClick={handleCompleteChallenge} className="w-full" disabled={challengeStatus !== "in-progress"}>
+                {challengeStatus === "in-progress" ? (
+                  <>He Completado el Reto</>
+                ) : (
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                )}
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Confetti effect for successful completion */}
       {showConfetti && (

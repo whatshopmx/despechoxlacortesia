@@ -4,15 +4,7 @@ import { useState } from "react"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Music, Award, Heart, ThumbsUp, Laugh, Smile, Sparkles, HelpCircle, Bot } from "lucide-react"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
+import { Music, Award, Heart, ThumbsUp, Laugh, Smile, Sparkles, Camera, Mic, Users, MessageSquare } from "lucide-react"
 import type { EmotionalCardModel } from "@/lib/card-models"
 
 interface EmotionalCardProps {
@@ -22,6 +14,7 @@ interface EmotionalCardProps {
   hideButton?: boolean
   showReactions?: boolean
   onReaction?: (type: string) => void
+  verificationType?: "self" | "group" | "ai" | "photo" | "audio" | "none"
 }
 
 export function EmotionalCard({
@@ -31,6 +24,7 @@ export function EmotionalCard({
   hideButton = false,
   showReactions = false,
   onReaction,
+  verificationType = "none",
 }: EmotionalCardProps) {
   const [showAiHelp, setShowAiHelp] = useState(false)
 
@@ -76,6 +70,38 @@ export function EmotionalCard({
     }
   }
 
+  // Determinar el icono de verificación
+  const getVerificationIcon = () => {
+    switch (verificationType) {
+      case "photo":
+        return <Camera className="h-4 w-4 mr-1" />
+      case "audio":
+        return <Mic className="h-4 w-4 mr-1" />
+      case "group":
+        return <Users className="h-4 w-4 mr-1" />
+      case "self":
+        return <MessageSquare className="h-4 w-4 mr-1" />
+      default:
+        return null
+    }
+  }
+
+  // Determinar el texto de verificación
+  const getVerificationText = () => {
+    switch (verificationType) {
+      case "photo":
+        return "Verificación por foto"
+      case "audio":
+        return "Verificación por audio"
+      case "group":
+        return "Verificación grupal"
+      case "self":
+        return "Verificación por texto"
+      default:
+        return null
+    }
+  }
+
   return (
     <Card className="w-full max-w-md mx-auto">
       <CardHeader className={`bg-gradient-to-r ${getGradientByGenre()} text-white`}>
@@ -86,6 +112,12 @@ export function EmotionalCard({
         <CardDescription className="text-white/80">
           {card.narrative_voice || "La Lotería del Despecho™"}
         </CardDescription>
+        {verificationType !== "none" && (
+          <Badge variant="secondary" className="mt-2 bg-white/20 text-white">
+            {getVerificationIcon()}
+            {getVerificationText()}
+          </Badge>
+        )}
       </CardHeader>
       <CardContent className="pt-6">
         <div className="space-y-4">
@@ -128,39 +160,6 @@ export function EmotionalCard({
                 </a>
               </div>
             </div>
-          )}
-
-          {/* Botón de ayuda de IA */}
-          {card.ai_backup_response && !isPreview && (
-            <Dialog>
-              <DialogTrigger asChild>
-                <Button
-                  variant="outline"
-                  className="w-full flex items-center justify-center gap-2 border-dashed"
-                  onClick={() => setShowAiHelp(true)}
-                >
-                  <HelpCircle className="h-4 w-4" />
-                  <span>No sé qué hacer... ¡Ayúdame!</span>
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle className="flex items-center gap-2">
-                    <Bot className="h-5 w-5" />
-                    Sugerencia de {card.narrative_voice || "La IA del Despecho"}
-                  </DialogTitle>
-                  <DialogDescription>
-                    Si no sabes qué decir o hacer, aquí tienes una sugerencia para completar el reto:
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="bg-muted/50 p-4 rounded-md border">
-                  <p className="italic">{card.ai_backup_response}</p>
-                </div>
-                <div className="text-sm text-muted-foreground">
-                  Puedes usar esta sugerencia tal cual o adaptarla a tu estilo personal.
-                </div>
-              </DialogContent>
-            </Dialog>
           )}
         </div>
       </CardContent>

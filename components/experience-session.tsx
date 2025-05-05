@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback, memo } from "react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -26,11 +26,14 @@ import {
   Music,
   Sparkles,
   HelpCircle,
+  Camera,
+  Mic,
+  FileText,
+  Share2,
 } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import { getRandomCard } from "@/lib/card-models"
 import type { EmotionalCardModel, StickerType } from "@/lib/card-models"
-import { AiSuggestion } from "@/components/ai-suggestion"
 
 // Tipos para los participantes y mensajes
 interface Participant {
@@ -52,11 +55,13 @@ interface ChatMessage {
   timestamp: Date
 }
 
+type ReactionType = "laugh" | "heart" | "thumbsUp" | "wow" | "applause"
+
 interface Reaction {
   id: string
   participantId: string
   participantName: string
-  type: "laugh" | "heart" | "thumbsUp" | "wow" | "applause"
+  type: ReactionType
   timestamp: Date
 }
 
@@ -69,6 +74,7 @@ interface ChallengeActivity {
   completed: boolean
   reactions: Reaction[]
   timestamp: Date
+  description?: string
 }
 
 interface ExperienceSessionProps {
@@ -78,6 +84,84 @@ interface ExperienceSessionProps {
   brandLogo?: string
 }
 
+// Componente de participante optimizado con memo
+const ParticipantItem = memo(({ participant }: { participant: Participant }) => {
+  const getIntensityColor = (intensity: number) => {
+    if (intensity < 40) return "bg-blue-500"
+    if (intensity < 70) return "bg-purple-500"
+    return "bg-red-500"
+  }
+
+  return (
+    <div
+      className={`flex items-center justify-between p-2 rounded-md ${
+        participant.isActive ? "bg-primary/10 border border-primary/20" : ""
+      }`}
+    >
+      <div className="flex items-center">
+        <Avatar className="h-8 w-8 mr-2">
+          <AvatarImage src={participant.avatar || "/placeholder.svg"} alt={participant.name} />
+          <AvatarFallback>{participant.name.charAt(0)}</AvatarFallback>
+        </Avatar>
+        <div>
+          <div className="font-medium text-sm flex items-center">
+            {participant.name}
+            {participant.isActive && (
+              <Badge variant="secondary" className="ml-2 text-xs">
+                Turno actual
+              </Badge>
+            )}
+          </div>
+          <div className="text-xs text-muted-foreground">{participant.completedChallenges} retos completados</div>
+        </div>
+      </div>
+      <div className="flex items-center">
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="w-16">
+                <Progress
+                  value={participant.emotionalIntensity}
+                  className={`h-1.5 ${getIntensityColor(participant.emotionalIntensity)}`}
+                />
+              </div>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Intensidad emocional: {participant.emotionalIntensity}%</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      </div>
+    </div>
+  )
+})
+
+ParticipantItem.displayName = "ParticipantItem"
+
+// Componente de mensaje de chat optimizado con memo
+const ChatMessageItem = memo(({ message }: { message: ChatMessage }) => {
+  return (
+    <div className="flex items-start gap-2">
+      <Avatar className="h-6 w-6">
+        <AvatarImage src={message.participantAvatar || "/placeholder.svg"} alt={message.participantName} />
+        <AvatarFallback>{message.participantName.charAt(0)}</AvatarFallback>
+      </Avatar>
+      <div>
+        <div className="flex items-center gap-2">
+          <span className="font-medium text-sm">{message.participantName}</span>
+          <span className="text-xs text-muted-foreground">
+            {message.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+          </span>
+        </div>
+        <p className="text-sm">{message.message}</p>
+      </div>
+    </div>
+  )
+})
+
+ChatMessageItem.displayName = "ChatMessageItem"
+
+// Componente principal
 export function ExperienceSession({
   initialCard,
   onChallengeComplete,
@@ -170,6 +254,9 @@ export function ExperienceSession({
   // Estado para mostrar la verificación
   const [showVerification, setShowVerification] = useState(false)
 
+  // Estado para el tipo de verificación
+  const [verificationType, setVerificationType] = useState<"photo" | "audio" | "text" | "group">("text")
+
   // Estado para los votos de verificación
   const [verificationVotes, setVerificationVotes] = useState<Record<string, boolean>>({})
 
@@ -191,6 +278,15 @@ export function ExperienceSession({
   // Estado para mostrar la sugerencia de IA
   const [showAiSuggestion, setShowAiSuggestion] = useState(false)
 
+  // Estado para mostrar confeti
+  const [showConfetti, setShowConfetti] = useState(false)
+
+  // Estado para el texto de verificación
+  const [verificationText, setVerificationText] = useState("")
+
+  // Estado para errores
+  const [error, setError] = useState<string | null>(null)
+
   // Efecto para simular el temporizador
   useEffect(() => {
     if (participants[currentTurn].isActive && timer > 0) {
@@ -202,8 +298,41 @@ export function ExperienceSession({
     }
   }, [timer, currentTurn, participants])
 
+  // Efecto para persistir el estado en localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        "experienceSession",
+        JSON.stringify({
+          participants,
+          currentTurn,
+          currentCard,
+          activityFeed,
+        }),
+      )
+    } catch (err) {
+      console.error("Error guardando sesión:", err)
+    }
+  }, [participants, currentTurn, currentCard, activityFeed])
+
+  // Efecto para cargar el estado desde localStorage
+  useEffect(() => {
+    try {
+      const savedSession = localStorage.getItem("experienceSession")
+      if (savedSession) {
+        const parsed = JSON.parse(savedSession)
+        setParticipants(parsed.participants || participants)
+        setCurrentTurn(parsed.currentTurn || 0)
+        setCurrentCard(parsed.currentCard || initialCard)
+        setActivityFeed(parsed.activityFeed || [])
+      }
+    } catch (err) {
+      console.error("Error cargando sesión:", err)
+    }
+  }, [])
+
   // Función para enviar un mensaje
-  const sendMessage = () => {
+  const sendMessage = useCallback(() => {
     if (!currentMessage.trim()) return
 
     const newMessage: ChatMessage = {
@@ -245,11 +374,30 @@ export function ExperienceSession({
       // Añadir notificación
       addNotification(`${randomParticipant.name} ha respondido a tu mensaje`)
     }, 2000)
-  }
+  }, [currentMessage, participants])
+
+  // Función para determinar el tipo de verificación basado en la carta
+  const determineVerificationType = useCallback((card: EmotionalCardModel): "photo" | "audio" | "text" | "group" => {
+    if (!card) return "text"
+
+    const challenge = card.challenge.toLowerCase()
+    if (challenge.includes("canta") || challenge.includes("karaoke") || challenge.includes("voz")) {
+      return "audio"
+    } else if (challenge.includes("foto") || challenge.includes("selfie") || challenge.includes("imagen")) {
+      return "photo"
+    } else if (challenge.includes("grupo") || challenge.includes("todos")) {
+      return "group"
+    }
+    return "text"
+  }, [])
 
   // Función para completar un reto
-  const completeChallenge = () => {
+  const completeChallenge = useCallback(() => {
     if (!currentCard) return
+
+    // Determinar el tipo de verificación
+    const verType = determineVerificationType(currentCard)
+    setVerificationType(verType)
 
     // Mostrar la verificación
     setShowVerification(true)
@@ -271,86 +419,94 @@ export function ExperienceSession({
       })
       setVerificationVotes(simulatedVotes)
     }, 2000)
-  }
+  }, [currentCard, participants, determineVerificationType])
 
   // Función para votar en la verificación
-  const voteOnVerification = (vote: boolean) => {
-    setVerificationVotes((prev) => ({
-      ...prev,
-      user: vote,
-    }))
+  const voteOnVerification = useCallback(
+    (vote: boolean) => {
+      setVerificationVotes((prev) => ({
+        ...prev,
+        user: vote,
+      }))
 
-    // Verificar si hay suficientes votos para determinar el resultado
-    setTimeout(() => {
-      const votes = Object.values({ ...verificationVotes, user: vote })
-      const positiveVotes = votes.filter((v) => v).length
-      const success = positiveVotes >= Math.ceil(participants.length / 2)
+      // Verificar si hay suficientes votos para determinar el resultado
+      setTimeout(() => {
+        const votes = Object.values({ ...verificationVotes, user: vote })
+        const positiveVotes = votes.filter((v) => v).length
+        const success = positiveVotes >= Math.ceil(participants.length / 2)
 
-      setChallengeSuccess(success)
-      setShowVerification(false)
-      setShowResult(true)
+        setChallengeSuccess(success)
+        setShowVerification(false)
+        setShowResult(true)
 
-      if (success) {
-        // Añadir al feed de actividad
-        const newActivity: ChallengeActivity = {
-          id: `activity-${Date.now()}`,
-          participantId: participants[currentTurn].id,
-          participantName: participants[currentTurn].name,
-          participantAvatar: participants[currentTurn].avatar,
-          card: currentCard,
-          completed: true,
-          reactions: [],
-          timestamp: new Date(),
-        }
+        if (success) {
+          // Mostrar confeti
+          setShowConfetti(true)
+          setTimeout(() => setShowConfetti(false), 3000)
 
-        setActivityFeed((prev) => [newActivity, ...prev])
+          // Añadir al feed de actividad
+          const newActivity: ChallengeActivity = {
+            id: `activity-${Date.now()}`,
+            participantId: participants[currentTurn].id,
+            participantName: participants[currentTurn].name,
+            participantAvatar: participants[currentTurn].avatar,
+            card: currentCard!,
+            completed: true,
+            reactions: [],
+            timestamp: new Date(),
+            description: verificationText || undefined,
+          }
 
-        // Actualizar la intensidad emocional del participante
-        setParticipants((prev) =>
-          prev.map((p) => {
-            if (p.id === participants[currentTurn].id) {
-              // Añadir un sticker basado en la carta
-              const newStickers = [...p.stickers]
-              if (currentCard.sticker_integration) {
-                const stickerMatch = currentCard.sticker_integration.match(/Ganas el sticker (.*?) si/)
-                if (stickerMatch && stickerMatch[1]) {
-                  newStickers.push(stickerMatch[1] as StickerType)
+          setActivityFeed((prev) => [newActivity, ...prev])
 
-                  // Añadir notificación de sticker
-                  addNotification(`¡Has ganado el sticker ${stickerMatch[1]}!`)
+          // Actualizar la intensidad emocional del participante
+          setParticipants((prev) =>
+            prev.map((p) => {
+              if (p.id === participants[currentTurn].id) {
+                // Añadir un sticker basado en la carta
+                const newStickers = [...p.stickers]
+                if (currentCard?.sticker_integration) {
+                  const stickerMatch = currentCard.sticker_integration.match(/Ganas el sticker (.*?) si/)
+                  if (stickerMatch && stickerMatch[1]) {
+                    newStickers.push(stickerMatch[1] as StickerType)
 
-                  // Verificar si se activa un combo
-                  checkForCombos(newStickers)
+                    // Añadir notificación de sticker
+                    addNotification(`¡Has ganado el sticker ${stickerMatch[1]}!`)
+
+                    // Verificar si se activa un combo
+                    checkForCombos(newStickers)
+                  }
+                }
+
+                return {
+                  ...p,
+                  emotionalIntensity: Math.min(100, p.emotionalIntensity + 15),
+                  completedChallenges: p.completedChallenges + 1,
+                  stickers: newStickers,
                 }
               }
+              return p
+            }),
+          )
 
-              return {
-                ...p,
-                emotionalIntensity: Math.min(100, p.emotionalIntensity + 15),
-                completedChallenges: p.completedChallenges + 1,
-                stickers: newStickers,
-              }
-            }
-            return p
-          }),
-        )
-
-        // Notificar al componente padre
-        if (onChallengeComplete) {
-          onChallengeComplete()
+          // Notificar al componente padre
+          if (onChallengeComplete) {
+            onChallengeComplete()
+          }
         }
-      }
 
-      // Pasar al siguiente turno después de un tiempo
-      setTimeout(() => {
-        setShowResult(false)
-        nextTurn()
-      }, 3000)
-    }, 1000)
-  }
+        // Pasar al siguiente turno después de un tiempo
+        setTimeout(() => {
+          setShowResult(false)
+          nextTurn()
+        }, 3000)
+      }, 1000)
+    },
+    [currentCard, currentTurn, participants, verificationText, verificationVotes, onChallengeComplete],
+  )
 
   // Función para verificar combos de stickers
-  const checkForCombos = (stickers: StickerType[]) => {
+  const checkForCombos = useCallback((stickers: StickerType[]) => {
     // Verificar combos predefinidos
     if (
       stickers.includes("🎤 Voz de Telenovela") &&
@@ -377,10 +533,10 @@ export function ExperienceSession({
       setShowCombo(true)
       addNotification("¡Has activado el combo Barra Libre de Excusas!")
     }
-  }
+  }, [])
 
   // Función para pasar al siguiente turno
-  const nextTurn = () => {
+  const nextTurn = useCallback(() => {
     const nextTurnIndex = (currentTurn + 1) % participants.length
     setCurrentTurn(nextTurnIndex)
 
@@ -395,6 +551,9 @@ export function ExperienceSession({
     // Reiniciar el temporizador
     setTimer(60)
 
+    // Reiniciar el texto de verificación
+    setVerificationText("")
+
     // Simular un nuevo reto
     if (initialCard) {
       setCurrentCard(initialCard)
@@ -404,52 +563,16 @@ export function ExperienceSession({
 
     // Añadir notificación
     addNotification(`Ahora es el turno de ${participants[nextTurnIndex].name}`)
-  }
+  }, [currentTurn, participants, initialCard])
 
   // Función para añadir una reacción a una actividad
-  const addReaction = (activityId: string, type: "laugh" | "heart" | "thumbsUp" | "wow" | "applause") => {
-    const newReaction: Reaction = {
-      id: `reaction-${Date.now()}`,
-      participantId: "user",
-      participantName: "Tú",
-      type,
-      timestamp: new Date(),
-    }
-
-    setActivityFeed((prev) =>
-      prev.map((activity) => {
-        if (activity.id === activityId) {
-          return {
-            ...activity,
-            reactions: [...activity.reactions, newReaction],
-          }
-        }
-        return activity
-      }),
-    )
-
-    // Añadir notificación
-    addNotification(
-      `Has reaccionado a la actividad de ${activityFeed.find((a) => a.id === activityId)?.participantName}`,
-    )
-
-    // Simular reacciones de otros participantes
-    setTimeout(() => {
-      const randomParticipant = participants.find((p) => p.id !== "user") || participants[1]
-      const reactionTypes: ("laugh" | "heart" | "thumbsUp" | "wow" | "applause")[] = [
-        "laugh",
-        "heart",
-        "thumbsUp",
-        "wow",
-        "applause",
-      ]
-      const randomType = reactionTypes[Math.floor(Math.random() * reactionTypes.length)]
-
-      const simulatedReaction: Reaction = {
-        id: `reaction-${Date.now() + 1}`,
-        participantId: randomParticipant.id,
-        participantName: randomParticipant.name,
-        type: randomType,
+  const addReaction = useCallback(
+    (activityId: string, type: ReactionType) => {
+      const newReaction: Reaction = {
+        id: `reaction-${Date.now()}`,
+        participantId: "user",
+        participantName: "Tú",
+        type,
         timestamp: new Date(),
       }
 
@@ -458,7 +581,7 @@ export function ExperienceSession({
           if (activity.id === activityId) {
             return {
               ...activity,
-              reactions: [...activity.reactions, simulatedReaction],
+              reactions: [...activity.reactions, newReaction],
             }
           }
           return activity
@@ -466,26 +589,59 @@ export function ExperienceSession({
       )
 
       // Añadir notificación
-      addNotification(`${randomParticipant.name} también ha reaccionado`)
-    }, 1500)
-  }
+      addNotification(
+        `Has reaccionado a la actividad de ${activityFeed.find((a) => a.id === activityId)?.participantName}`,
+      )
+
+      // Simular reacciones de otros participantes
+      setTimeout(() => {
+        const randomParticipant = participants.find((p) => p.id !== "user") || participants[1]
+        const reactionTypes: ReactionType[] = ["laugh", "heart", "thumbsUp", "wow", "applause"]
+        const randomType = reactionTypes[Math.floor(Math.random() * reactionTypes.length)]
+
+        const simulatedReaction: Reaction = {
+          id: `reaction-${Date.now() + 1}`,
+          participantId: randomParticipant.id,
+          participantName: randomParticipant.name,
+          type: randomType,
+          timestamp: new Date(),
+        }
+
+        setActivityFeed((prev) =>
+          prev.map((activity) => {
+            if (activity.id === activityId) {
+              return {
+                ...activity,
+                reactions: [...activity.reactions, simulatedReaction],
+              }
+            }
+            return activity
+          }),
+        )
+
+        // Añadir notificación
+        addNotification(`${randomParticipant.name} también ha reaccionado`)
+      }, 1500)
+    },
+    [activityFeed, participants],
+  )
 
   // Función para formatear el tiempo
-  const formatTime = (seconds: number) => {
+  const formatTime = useCallback((seconds: number) => {
     const mins = Math.floor(seconds / 60)
     const secs = seconds % 60
     return `${mins}:${secs < 10 ? "0" : ""}${secs}`
-  }
+  }, [])
 
   // Función para obtener el color de intensidad
-  const getIntensityColor = (intensity: number) => {
+  const getIntensityColor = useCallback((intensity: number) => {
     if (intensity < 40) return "bg-blue-500"
     if (intensity < 70) return "bg-purple-500"
     return "bg-red-500"
-  }
+  }, [])
 
   // Función para obtener el icono de reacción
-  const getReactionIcon = (type: string) => {
+  const getReactionIcon = useCallback((type: string) => {
     switch (type) {
       case "laugh":
         return <Laugh className="h-4 w-4 text-yellow-500" />
@@ -500,17 +656,63 @@ export function ExperienceSession({
       default:
         return <ThumbsUp className="h-4 w-4" />
     }
-  }
+  }, [])
 
   // Función para añadir notificaciones
-  const addNotification = (message: string) => {
+  const addNotification = useCallback((message: string) => {
     setNotifications((prev) => [message, ...prev].slice(0, 5))
 
     // Auto-eliminar después de 5 segundos
     setTimeout(() => {
       setNotifications((prev) => prev.filter((n) => n !== message))
     }, 5000)
-  }
+  }, [])
+
+  // Función para obtener el icono de verificación
+  const getVerificationIcon = useCallback((type: "photo" | "audio" | "text" | "group") => {
+    switch (type) {
+      case "photo":
+        return <Camera className="h-5 w-5 mr-2" />
+      case "audio":
+        return <Mic className="h-5 w-5 mr-2" />
+      case "text":
+        return <FileText className="h-5 w-5 mr-2" />
+      case "group":
+        return <Users className="h-5 w-5 mr-2" />
+      default:
+        return <CheckCircle className="h-5 w-5 mr-2" />
+    }
+  }, [])
+
+  // Función para compartir una actividad
+  const shareActivity = useCallback((activity: ChallengeActivity) => {
+    try {
+      if (navigator.share) {
+        navigator
+          .share({
+            title: `${activity.participantName} completó un reto en La Cortesía`,
+            text: `${activity.participantName} completó el reto "${activity.card.card_title}" en La Cortesía. ¡Únete a la experiencia!`,
+            url: window.location.href,
+          })
+          .then(() => {
+            addNotification("¡Compartido con éxito!")
+          })
+          .catch((error) => {
+            console.error("Error compartiendo:", error)
+            addNotification("No se pudo compartir")
+          })
+      } else {
+        // Fallback para navegadores que no soportan Web Share API
+        navigator.clipboard.writeText(
+          `${activity.participantName} completó el reto "${activity.card.card_title}" en La Cortesía. ¡Únete a la experiencia! ${window.location.href}`,
+        )
+        addNotification("Enlace copiado al portapapeles")
+      }
+    } catch (err) {
+      console.error("Error compartiendo:", err)
+      setError("No se pudo compartir la actividad")
+    }
+  }, [])
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -566,49 +768,7 @@ export function ExperienceSession({
           <CardContent>
             <div className="space-y-3">
               {participants.map((participant) => (
-                <div
-                  key={participant.id}
-                  className={`flex items-center justify-between p-2 rounded-md ${
-                    participant.isActive ? "bg-primary/10" : ""
-                  }`}
-                >
-                  <div className="flex items-center">
-                    <Avatar className="h-8 w-8 mr-2">
-                      <AvatarImage src={participant.avatar || "/placeholder.svg"} alt={participant.name} />
-                      <AvatarFallback>{participant.name.charAt(0)}</AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <div className="font-medium text-sm flex items-center">
-                        {participant.name}
-                        {participant.isActive && (
-                          <Badge variant="secondary" className="ml-2 text-xs">
-                            Turno actual
-                          </Badge>
-                        )}
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        {participant.completedChallenges} retos completados
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex items-center">
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <div className="w-16">
-                            <Progress
-                              value={participant.emotionalIntensity}
-                              className={`h-1.5 ${getIntensityColor(participant.emotionalIntensity)}`}
-                            />
-                          </div>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>Intensidad emocional: {participant.emotionalIntensity}%</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  </div>
-                </div>
+                <ParticipantItem key={participant.id} participant={participant} />
               ))}
             </div>
           </CardContent>
@@ -626,24 +786,7 @@ export function ExperienceSession({
             <ScrollArea className="h-[280px]">
               <div className="space-y-4">
                 {chatMessages.map((message) => (
-                  <div key={message.id} className="flex items-start gap-2">
-                    <Avatar className="h-6 w-6">
-                      <AvatarImage
-                        src={message.participantAvatar || "/placeholder.svg"}
-                        alt={message.participantName}
-                      />
-                      <AvatarFallback>{message.participantName.charAt(0)}</AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium text-sm">{message.participantName}</span>
-                        <span className="text-xs text-muted-foreground">
-                          {message.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                        </span>
-                      </div>
-                      <p className="text-sm">{message.message}</p>
-                    </div>
-                  </div>
+                  <ChatMessageItem key={message.id} message={message} />
                 ))}
               </div>
             </ScrollArea>
@@ -686,19 +829,39 @@ export function ExperienceSession({
           <CardContent className="flex-grow flex items-center justify-center">
             {currentCard ? (
               <div className="w-full">
-                <EmotionalCard card={currentCard} hideButton={true} />
+                <div className="mb-4">
+                  <Badge variant="outline" className="mb-2 flex items-center">
+                    {getVerificationIcon(determineVerificationType(currentCard))}
+                    <span>
+                      {determineVerificationType(currentCard) === "photo"
+                        ? "Verificación con foto"
+                        : determineVerificationType(currentCard) === "audio"
+                          ? "Verificación con audio"
+                          : determineVerificationType(currentCard) === "group"
+                            ? "Verificación grupal"
+                            : "Verificación con texto"}
+                    </span>
+                  </Badge>
+                  <EmotionalCard card={currentCard} hideButton={true} />
+                </div>
+
+                {/* Sugerencia de IA directamente en la carta */}
+                {currentCard?.ai_backup_response && (
+                  <div className="bg-purple-100 p-3 rounded-md mb-4 border border-purple-200">
+                    <div className="flex items-start">
+                      <div className="bg-purple-200 p-2 rounded-full mr-2">
+                        <HelpCircle className="h-4 w-4 text-purple-700" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-purple-800 mb-1">Sugerencia de IA:</p>
+                        <p className="text-sm text-purple-700">{currentCard.ai_backup_response}</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {participants[currentTurn].id === "user" && (
                   <div className="flex flex-col gap-2 mt-4">
-                    {currentCard?.ai_backup_response && (
-                      <Button
-                        variant="outline"
-                        className="w-full flex items-center justify-center gap-2 border-dashed"
-                        onClick={() => setShowAiSuggestion(true)}
-                      >
-                        <HelpCircle className="h-4 w-4" />
-                        <span>No sé qué hacer... ¡Ayúdame!</span>
-                      </Button>
-                    )}
                     <Button className="w-full" onClick={completeChallenge}>
                       He Completado el Reto
                     </Button>
@@ -767,6 +930,12 @@ export function ExperienceSession({
                             <div className="text-sm font-medium mb-1">{activity.card.card_title}</div>
                             <div className="text-xs text-muted-foreground">{activity.card.challenge}</div>
 
+                            {activity.description && (
+                              <div className="mt-2 text-xs bg-muted p-2 rounded-md">
+                                <span className="font-medium">Respuesta:</span> {activity.description}
+                              </div>
+                            )}
+
                             {activity.card.spotify_song && (
                               <div className="flex items-center gap-2 mt-2 text-xs text-gray-500">
                                 <Music className="h-3 w-3" />
@@ -820,6 +989,14 @@ export function ExperienceSession({
                                 onClick={() => addReaction(activity.id, "laugh")}
                               >
                                 <Laugh className="h-3.5 w-3.5" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7"
+                                onClick={() => shareActivity(activity)}
+                              >
+                                <Share2 className="h-3.5 w-3.5" />
                               </Button>
                             </div>
                           </CardFooter>
@@ -876,13 +1053,49 @@ export function ExperienceSession({
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <Card className="w-full max-w-md">
             <CardHeader>
-              <CardTitle>Verificación del Reto</CardTitle>
+              <CardTitle className="flex items-center">
+                {getVerificationIcon(verificationType)}
+                Verificación del Reto
+              </CardTitle>
               <CardDescription>
-                Los participantes están verificando si {participants[currentTurn].name} completó el reto correctamente.
+                {verificationType === "photo"
+                  ? "Sube una foto como evidencia de que completaste el reto"
+                  : verificationType === "audio"
+                    ? "Graba un audio como evidencia de que completaste el reto"
+                    : verificationType === "group"
+                      ? "Los participantes verificarán si el grupo completó el reto correctamente"
+                      : "Describe cómo completaste el reto"}
               </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
+                {verificationType === "photo" && (
+                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+                    <Camera className="h-8 w-8 mx-auto text-gray-400 mb-2" />
+                    <p className="text-sm text-gray-500">Haz clic para subir una foto</p>
+                    <p className="text-xs text-gray-400 mt-1">(Esta es una simulación, no se subirá ninguna foto)</p>
+                  </div>
+                )}
+
+                {verificationType === "audio" && (
+                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+                    <Mic className="h-8 w-8 mx-auto text-gray-400 mb-2" />
+                    <p className="text-sm text-gray-500">Haz clic para grabar un audio</p>
+                    <p className="text-xs text-gray-400 mt-1">(Esta es una simulación, no se grabará ningún audio)</p>
+                  </div>
+                )}
+
+                {verificationType === "text" && (
+                  <div>
+                    <Input
+                      placeholder="Describe cómo completaste el reto..."
+                      value={verificationText}
+                      onChange={(e) => setVerificationText(e.target.value)}
+                      className="mb-2"
+                    />
+                  </div>
+                )}
+
                 <div className="flex flex-wrap gap-2">
                   {participants.map((participant) => (
                     <div key={participant.id} className="text-center">
@@ -1040,7 +1253,7 @@ export function ExperienceSession({
       )}
 
       {/* Confetti para celebración */}
-      {challengeSuccess && showResult && (
+      {showConfetti && (
         <div className="fixed inset-0 pointer-events-none z-50">
           <AnimatePresence>
             {Array.from({ length: 50 }).map((_, i) => {
@@ -1079,13 +1292,18 @@ export function ExperienceSession({
         </div>
       )}
 
-      {/* Sugerencia de IA */}
-      {showAiSuggestion && currentCard?.ai_backup_response && (
-        <AiSuggestion
-          narrativeVoice={currentCard.narrative_voice || "La IA del Despecho"}
-          suggestion={currentCard.ai_backup_response}
-          onClose={() => setShowAiSuggestion(false)}
-        />
+      {/* Error message */}
+      {error && (
+        <div className="fixed bottom-4 right-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded z-50">
+          <div className="flex items-center">
+            <AlertCircle className="h-4 w-4 mr-2" />
+            <span>{error}</span>
+            <Button variant="ghost" size="sm" className="ml-2 h-6 w-6 p-0" onClick={() => setError(null)}>
+              <span className="sr-only">Cerrar</span>
+              <span aria-hidden="true">&times;</span>
+            </Button>
+          </div>
+        </div>
       )}
     </div>
   )
