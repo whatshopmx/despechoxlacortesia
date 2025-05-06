@@ -30,6 +30,7 @@ const sampleCards: Card[] = [
       url: "https://open.spotify.com/track/5ricyQVd3gobVoinkRFgBF",
     },
     sticker_integration: "Desbloquea el sticker 'Textos Peligrosos'",
+    challenge_type: "individual",
   },
   {
     card_id: "card_002",
@@ -49,6 +50,8 @@ const sampleCards: Card[] = [
       logo: "/placeholder.svg?height=40&width=120&text=Tecate",
       rewardValue: 50,
     },
+    challenge_type: "duet",
+    partner_selection: "choose",
   },
   {
     card_id: "card_003",
@@ -62,6 +65,34 @@ const sampleCards: Card[] = [
     ai_backup_response:
       "Puedes confesar: 'Mi playlist secreto de breakup está lleno de Adele, Taylor Swift y baladas de Luis Miguel'",
     narrative_voice: "Nostalgia Digital™",
+    challenge_type: "group",
+  },
+  {
+    card_id: "card_004",
+    card_title: "EL KARAOKE DEL DESAMOR",
+    challenge: "Canta el coro de una canción que siempre te recuerda a tu ex",
+    social_trigger: "Si al menos 3 personas cantan contigo, ganas un shot gratis",
+    reward: "Filtro AR 'Estrella de Karaoke'",
+    reward_type: "digital",
+    emotional_tier: "intense",
+    genre_tag: "Reggaetón Sad",
+    ai_backup_response: "Algunos clásicos para cantar son 'Ya lo sé' de Cristian Castro o 'Amorfoda' de Bad Bunny",
+    narrative_voice: "Nostalgia Digital™",
+    challenge_type: "group",
+  },
+  {
+    card_id: "card_005",
+    card_title: "LOS TEXTOS FANTASMAS",
+    challenge: "Muestra el último mensaje que dejaste en visto y explica por qué",
+    social_trigger: "Si alguien confiesa que ha hecho lo mismo, ambos ganan un sticker",
+    reward: "Sticker digital 'Ghosteador Profesional'",
+    reward_type: "digital",
+    emotional_tier: "mild",
+    genre_tag: "Terapia Express",
+    ai_backup_response: "Podrías decir: 'Le dejé en visto porque me preguntó si podíamos vernos y me entró pánico'",
+    narrative_voice: "Bot Sarcástico",
+    challenge_type: "duet",
+    partner_selection: "random",
   },
 ]
 

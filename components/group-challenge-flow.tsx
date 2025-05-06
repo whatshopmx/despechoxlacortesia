@@ -3,10 +3,12 @@
 import { useState, useRef, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import type { Card } from "@/lib/card-generator-pipeline-enhanced"
+import type { ChallengeType } from "@/lib/card-models"
 import { useChallenge } from "@/contexts/challenge-context"
 import { Button } from "@/components/ui/button"
 import { EmotionalCard } from "@/components/emotional-card"
 import { Progress } from "@/components/ui/progress"
+import { Textarea } from "@/components/ui/textarea"
 import {
   Camera,
   Mic,
@@ -19,6 +21,9 @@ import {
   Users,
   ChevronLeft,
   ChevronRight,
+  User,
+  UserPlus,
+  HelpCircle,
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -28,7 +33,16 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { motion, AnimatePresence } from "framer-motion"
 import { GroupSidebar } from "./group-sidebar"
 import { GroupRewardsSummary } from "./group-rewards-summary"
-import { Dialog, DialogContent } from "@/components/ui/dialog"
+import {
+  Dialog,
+  DialogContent,
+  DialogTrigger,
+  DialogTitle,
+  DialogHeader,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 // New typed interfaces for our challenge system
 interface Player {
@@ -84,6 +98,10 @@ export function GroupChallengeFlow({ initialPlayers, cards, brandInfo, onComplet
   const [showConfetti, setShowConfetti] = useState(false)
   const [expanded, setExpanded] = useState(false)
   const [showRewardsSummary, setShowRewardsSummary] = useState(false)
+  const [textVerification, setTextVerification] = useState<string>("")
+  const [showPartnerSelection, setShowPartnerSelection] = useState(false)
+  const [selectedPartner, setSelectedPartner] = useState<string | null>(null)
+  const [groupParticipation, setGroupParticipation] = useState<Record<string, boolean>>({})
 
   // State for verification methods
   const [photoData, setPhotoData] = useState<string | null>(null)
@@ -106,18 +124,50 @@ export function GroupChallengeFlow({ initialPlayers, cards, brandInfo, onComplet
   const currentPlayer = players[currentPlayerIndex]
   const currentCard = currentPlayer?.assignedCards[0] || null
 
+  // Determine challenge type
+  const challengeType: ChallengeType = currentCard?.challenge_type || "individual"
+  const partnerSelectionType = currentCard?.partner_selection || "random"
+
   // Start the challenge when the component mounts
   useEffect(() => {
     if (!isInitialized && currentCard) {
       try {
         startChallenge(currentCard)
         setIsInitialized(true)
+
+        // Reset partner selection and group participation on new challenge
+        setSelectedPartner(null)
+        setGroupParticipation({})
+
+        // For duet challenges, show partner selection
+        if (challengeType === "duet") {
+          // If random partner, select one automatically
+          if (partnerSelectionType === "random") {
+            const availablePartners = players.filter((p) => p.id !== currentPlayer.id)
+            if (availablePartners.length > 0) {
+              const randomIndex = Math.floor(Math.random() * availablePartners.length)
+              setSelectedPartner(availablePartners[randomIndex].id)
+            }
+          } else {
+            // Show partner selection dialog
+            setShowPartnerSelection(true)
+          }
+        }
+
+        // For group challenges, initialize participation
+        if (challengeType === "group") {
+          const initialParticipation: Record<string, boolean> = {}
+          players.forEach((p) => {
+            initialParticipation[p.id] = p.id === currentPlayer.id // Current player is always participating
+          })
+          setGroupParticipation(initialParticipation)
+        }
       } catch (err) {
         console.error("Error starting challenge:", err)
         setVerificationError("Error al iniciar el reto. Por favor, intenta de nuevo.")
       }
     }
-  }, [currentCard, startChallenge, isInitialized])
+  }, [currentCard, startChallenge, isInitialized, challengeType, partnerSelectionType, players, currentPlayer])
 
   // Handle turn timer
   useEffect(() => {
@@ -164,8 +214,11 @@ export function GroupChallengeFlow({ initialPlayers, cards, brandInfo, onComplet
     setPhotoData(null)
     setAudioData(null)
     setGroupVotes(0)
+    setTextVerification("")
     resetChallenge()
     setIsInitialized(false)
+    setSelectedPartner(null)
+    setGroupParticipation({})
 
     // Update players array
     setPlayers((prevPlayers) => {
@@ -208,8 +261,11 @@ export function GroupChallengeFlow({ initialPlayers, cards, brandInfo, onComplet
       setPhotoData(null)
       setAudioData(null)
       setGroupVotes(0)
+      setTextVerification("")
       resetChallenge()
       setIsInitialized(false)
+      setSelectedPartner(null)
+      setGroupParticipation({})
 
       // Update all players' turn status
       setPlayers((prevPlayers) => {
@@ -270,6 +326,39 @@ export function GroupChallengeFlow({ initialPlayers, cards, brandInfo, onComplet
     } catch (err) {
       console.error("Error completing challenge:", err)
       setVerificationError("Error al completar el reto. Por favor, intenta de nuevo.")
+    }
+  }
+
+  // Handle partner selection confirmation
+  const handlePartnerConfirm = () => {
+    setShowPartnerSelection(false)
+  }
+
+  // Handle group participation toggle
+  const toggleGroupParticipation = (playerId: string) => {
+    setGroupParticipation((prev) => ({
+      ...prev,
+      [playerId]: !prev[playerId],
+    }))
+  }
+
+  // Get participating players count
+  const getParticipatingPlayersCount = () => {
+    return Object.values(groupParticipation).filter(Boolean).length
+  }
+
+  // Get challenge status message
+  const getChallengeStatusMessage = () => {
+    switch (challengeType) {
+      case "individual":
+        return "Reto individual: Solo tú debes completarlo"
+      case "duet":
+        const partner = players.find((p) => p.id === selectedPartner)
+        return `Reto en dueto: Tú y ${partner ? partner.name : "tu compañero"} deben completarlo juntos`
+      case "group":
+        return `Reto grupal: ${getParticipatingPlayersCount()} de ${players.length} participantes`
+      default:
+        return ""
     }
   }
 
@@ -399,6 +488,30 @@ export function GroupChallengeFlow({ initialPlayers, cards, brandInfo, onComplet
     }
   }
 
+  // Handle text verification
+  const submitTextVerification = async () => {
+    if (!textVerification.trim()) {
+      setVerificationError("Por favor, describe cómo completaste el reto.")
+      return
+    }
+
+    try {
+      // Simulate verification with text
+      const success = true // Always succeed for demo purposes
+
+      if (success) {
+        updatePlayerProgress("text")
+        setShowConfetti(true)
+        setTimeout(() => setShowConfetti(false), 3000)
+      }
+
+      setActiveTab("result")
+    } catch (err) {
+      console.error("Error submitting text verification:", err)
+      setVerificationError("Ocurrió un error al enviar la verificación. Por favor, intenta de nuevo.")
+    }
+  }
+
   // Handle group verification
   const addGroupVote = () => {
     setGroupVotes((prev) => prev + 1)
@@ -452,13 +565,55 @@ export function GroupChallengeFlow({ initialPlayers, cards, brandInfo, onComplet
       // Remove the completed card from assignedCards
       const remainingCards = player.assignedCards.filter((card) => card.card_id !== currentCard?.card_id)
 
-      // Update the player
+      // Update the current player
       updatedPlayers[currentPlayerIndex] = {
         ...player,
         completedCards,
         emotionalScore,
         tier,
-        assignedCards: remainingCards, // Actualizar con las cartas restantes
+        assignedCards: remainingCards,
+      }
+
+      // For duet challenges, also update the partner's progress
+      if (challengeType === "duet" && selectedPartner) {
+        const partnerIndex = updatedPlayers.findIndex((p) => p.id === selectedPartner)
+        if (partnerIndex !== -1) {
+          const partner = updatedPlayers[partnerIndex]
+
+          // Partner gets half the emotional intensity increase
+          const partnerIntensityIncrease = Math.floor(intensityIncrease / 2)
+          const partnerEmotionalScore = Math.min(100, partner.emotionalScore + partnerIntensityIncrease)
+
+          // Partner doesn't complete the card, but gets emotional score
+          updatedPlayers[partnerIndex] = {
+            ...partner,
+            emotionalScore: partnerEmotionalScore,
+            tier: calculateTier(partner.completedCards.length, partnerEmotionalScore),
+          }
+        }
+      }
+
+      // For group challenges, update all participating players' progress
+      if (challengeType === "group") {
+        Object.entries(groupParticipation).forEach(([playerId, isParticipating]) => {
+          if (isParticipating && playerId !== player.id) {
+            // Skip current player as already updated
+            const participantIndex = updatedPlayers.findIndex((p) => p.id === playerId)
+            if (participantIndex !== -1) {
+              const participant = updatedPlayers[participantIndex]
+
+              // Participants get 1/3 of the emotional intensity increase
+              const participantIntensityIncrease = Math.floor(intensityIncrease / 3)
+              const participantEmotionalScore = Math.min(100, participant.emotionalScore + participantIntensityIncrease)
+
+              updatedPlayers[participantIndex] = {
+                ...participant,
+                emotionalScore: participantEmotionalScore,
+                tier: calculateTier(participant.completedCards.length, participantEmotionalScore),
+              }
+            }
+          }
+        })
       }
 
       return updatedPlayers
@@ -639,12 +794,19 @@ export function GroupChallengeFlow({ initialPlayers, cards, brandInfo, onComplet
       default:
         return (
           <div className="space-y-4">
-            <h3 className="text-lg font-medium">Auto-verificación</h3>
-            <p className="text-sm text-gray-500">Confirma que has completado el reto.</p>
+            <h3 className="text-lg font-medium">Cuéntanos cómo completaste el reto</h3>
+            <p className="text-sm text-gray-500">Describe brevemente cómo realizaste el desafío.</p>
 
-            <Button onClick={() => verifyChallenge("self")} className="w-full">
+            <Textarea
+              placeholder="Escribe aquí tu descripción..."
+              value={textVerification}
+              onChange={(e) => setTextVerification(e.target.value)}
+              className="min-h-[120px]"
+            />
+
+            <Button onClick={submitTextVerification} className="w-full" disabled={!textVerification.trim()}>
               <CheckCircle className="mr-2 h-4 w-4" />
-              Confirmar Reto Completado
+              Enviar Verificación
             </Button>
           </div>
         )
@@ -833,6 +995,46 @@ export function GroupChallengeFlow({ initialPlayers, cards, brandInfo, onComplet
             </Badge>
           </div>
 
+          {/* Challenge type indicator */}
+          {currentCard && (
+            <div className="mb-4 p-3 rounded-lg border bg-white shadow-sm">
+              <div className="flex items-center gap-2">
+                {challengeType === "individual" && <User className="h-5 w-5 text-blue-500" />}
+                {challengeType === "duet" && <UserPlus className="h-5 w-5 text-purple-500" />}
+                {challengeType === "group" && <Users className="h-5 w-5 text-green-500" />}
+                <h3 className="font-medium">{getChallengeStatusMessage()}</h3>
+              </div>
+
+              {challengeType === "duet" && selectedPartner && (
+                <div className="mt-2 flex items-center">
+                  <Avatar className="h-6 w-6 mr-2">
+                    <AvatarImage src={players.find((p) => p.id === selectedPartner)?.avatar || "/placeholder.svg"} />
+                    <AvatarFallback>{players.find((p) => p.id === selectedPartner)?.name?.[0] || "?"}</AvatarFallback>
+                  </Avatar>
+                  <span className="text-sm">Tu compañero: {players.find((p) => p.id === selectedPartner)?.name}</span>
+                </div>
+              )}
+
+              {challengeType === "group" && (
+                <div className="mt-2">
+                  <span className="text-sm text-gray-500">Participantes:</span>
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    {players.map((player) => (
+                      <Badge
+                        key={player.id}
+                        variant={groupParticipation[player.id] ? "default" : "outline"}
+                        className="cursor-pointer"
+                        onClick={() => toggleGroupParticipation(player.id)}
+                      >
+                        {player.name}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="challenge">Reto</TabsTrigger>
@@ -852,6 +1054,7 @@ export function GroupChallengeFlow({ initialPlayers, cards, brandInfo, onComplet
                     isPreview={false}
                     hideButton={true}
                     showReactions={true}
+                    verificationType={verificationMethod}
                     onReaction={(type) => console.log("Reaction:", type)}
                   />
 
@@ -914,6 +1117,96 @@ export function GroupChallengeFlow({ initialPlayers, cards, brandInfo, onComplet
         </div>
       </div>
 
+      {/* Dialog for partner selection */}
+      <Dialog open={showPartnerSelection} onOpenChange={setShowPartnerSelection}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Elige un compañero para el reto</DialogTitle>
+            <DialogDescription>
+              Este es un reto en dueto. Selecciona a otro jugador para completar el reto juntos.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="py-4">
+            <Select value={selectedPartner || ""} onValueChange={setSelectedPartner}>
+              <SelectTrigger>
+                <SelectValue placeholder="Selecciona un compañero" />
+              </SelectTrigger>
+              <SelectContent>
+                {players
+                  .filter((p) => p.id !== currentPlayer.id)
+                  .map((player) => (
+                    <SelectItem key={player.id} value={player.id}>
+                      {player.name}
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <DialogFooter>
+            <Button onClick={handlePartnerConfirm} disabled={!selectedPartner}>
+              Confirmar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Help dialog */}
+      <Dialog>
+        <DialogTrigger asChild>
+          <Button
+            variant="outline"
+            size="icon"
+            className="fixed bottom-4 right-4 rounded-full h-10 w-10 bg-white shadow-lg"
+          >
+            <HelpCircle className="h-5 w-5" />
+          </Button>
+        </DialogTrigger>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Tipos de Retos</DialogTitle>
+            <DialogDescription>
+              En La Cortesía, hay tres tipos de retos que pueden aparecer en las cartas:
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="flex items-start gap-3">
+              <User className="h-5 w-5 text-blue-500 mt-0.5" />
+              <div>
+                <h4 className="font-medium">Retos Individuales</h4>
+                <p className="text-sm text-gray-500">
+                  Estos retos los completa únicamente el jugador en turno. Solo tú debes completar el desafío.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3">
+              <UserPlus className="h-5 w-5 text-purple-500 mt-0.5" />
+              <div>
+                <h4 className="font-medium">Retos en Dueto</h4>
+                <p className="text-sm text-gray-500">
+                  Para estos retos necesitas un compañero. El sistema puede elegir uno aleatoriamente o permitirte
+                  seleccionar con quién quieres completar el reto.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3">
+              <Users className="h-5 w-5 text-green-500 mt-0.5" />
+              <div>
+                <h4 className="font-medium">Retos Grupales</h4>
+                <p className="text-sm text-gray-500">
+                  Estos retos involucran a todo el grupo. Todos los participantes deben contribuir para completarlo,
+                  aunque la principal responsabilidad es del jugador en turno.
+                </p>
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Confetti effect for successful completion */}
       {showConfetti && (
         <div className="fixed inset-0 pointer-events-none z-50">
@@ -931,16 +1224,6 @@ export function GroupChallengeFlow({ initialPlayers, cards, brandInfo, onComplet
                   key={i}
                   initial={{ x: `${x}vw`, y: `${y}vh` }}
                   animate={{
-                    y: "110vh",
-                    rotate: 360,
-                    transition: {
-                      duration,
-                      delay,
-                      ease: "easeIn",
-                    },
-                  }}
-                  exit={{ opacity: 0 }}
-                  style={{
                     y: "110vh",
                     rotate: 360,
                     transition: {

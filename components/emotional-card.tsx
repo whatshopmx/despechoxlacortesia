@@ -4,7 +4,21 @@ import { useState } from "react"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Music, Award, Heart, ThumbsUp, Laugh, Smile, Sparkles, Camera, Mic, Users, MessageSquare } from "lucide-react"
+import {
+  Music,
+  Award,
+  Heart,
+  ThumbsUp,
+  Laugh,
+  Smile,
+  Sparkles,
+  Camera,
+  Mic,
+  Users,
+  MessageSquare,
+  UserPlus,
+  User,
+} from "lucide-react"
 import type { EmotionalCardModel } from "@/lib/card-models"
 
 interface EmotionalCardProps {
@@ -102,6 +116,38 @@ export function EmotionalCard({
     }
   }
 
+  // Obtener icono y texto del tipo de reto
+  const getChallengeTypeInfo = () => {
+    switch (card.challenge_type) {
+      case "individual":
+        return {
+          icon: <User className="h-4 w-4 mr-1" />,
+          text: "Reto individual",
+          color: "bg-blue-100 text-blue-800",
+        }
+      case "duet":
+        return {
+          icon: <UserPlus className="h-4 w-4 mr-1" />,
+          text: "Reto en dueto",
+          color: "bg-purple-100 text-purple-800",
+        }
+      case "group":
+        return {
+          icon: <Users className="h-4 w-4 mr-1" />,
+          text: "Reto grupal",
+          color: "bg-green-100 text-green-800",
+        }
+      default:
+        return {
+          icon: <User className="h-4 w-4 mr-1" />,
+          text: "Reto individual",
+          color: "bg-blue-100 text-blue-800",
+        }
+    }
+  }
+
+  const challengeTypeInfo = getChallengeTypeInfo()
+
   return (
     <Card className="w-full max-w-md mx-auto">
       <CardHeader className={`bg-gradient-to-r ${getGradientByGenre()} text-white`}>
@@ -112,12 +158,22 @@ export function EmotionalCard({
         <CardDescription className="text-white/80">
           {card.narrative_voice || "La Lotería del Despecho™"}
         </CardDescription>
-        {verificationType !== "none" && (
-          <Badge variant="secondary" className="mt-2 bg-white/20 text-white">
-            {getVerificationIcon()}
-            {getVerificationText()}
+
+        <div className="flex flex-wrap gap-2 mt-2">
+          {/* Badge para el tipo de reto */}
+          <Badge variant="secondary" className={`bg-white/20 text-white`}>
+            {challengeTypeInfo.icon}
+            {challengeTypeInfo.text}
           </Badge>
-        )}
+
+          {/* Badge para tipo de verificación */}
+          {verificationType !== "none" && (
+            <Badge variant="secondary" className="bg-white/20 text-white">
+              {getVerificationIcon()}
+              {getVerificationText()}
+            </Badge>
+          )}
+        </div>
       </CardHeader>
       <CardContent className="pt-6">
         <div className="space-y-4">

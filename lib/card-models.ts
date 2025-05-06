@@ -56,6 +56,13 @@ export enum StickerType {
   RUGIDO_INTERNO = "🦁 Rugido Interno",
 }
 
+// Tipos de retos según la cantidad de participantes
+export enum ChallengeType {
+  INDIVIDUAL = "individual",
+  DUET = "duet",
+  GROUP = "group",
+}
+
 // Niveles de caos
 export enum ChaosLevel {
   MILD = "mild",
@@ -97,6 +104,8 @@ export interface EmotionalCardModel {
   narrative_voice?: NarrativeVoice
   emotional_tone?: EmotionalTone
   stylistic_language?: StylisticLanguage
+  challenge_type?: ChallengeType // Tipo de reto: individual, dueto o grupal
+  partner_selection?: "random" | "choose" // Para retos en dueto: random o elegir compañero
 }
 
 // Modelo para el combo de stickers
@@ -130,6 +139,7 @@ export const PREDEFINED_CARDS: EmotionalCardModel[] = [
     emotional_tone: EmotionalTone.DESPECHO,
     stylistic_language: StylisticLanguage.JERGA_DIGITAL,
     sticker_integration: "Ganas el sticker 🎤 Voz de Telenovela si logras que alguien llore durante tu interpretación.",
+    challenge_type: ChallengeType.INDIVIDUAL,
   },
   {
     card_title: "💔 El Ex-Bot que Nunca Silencia 🔧💔",
@@ -152,6 +162,8 @@ export const PREDEFINED_CARDS: EmotionalCardModel[] = [
     stylistic_language: StylisticLanguage.TERAPIA_MEME,
     sticker_integration:
       "Ganas el sticker 💔 Corazón Roto™ al completar 2 diagnósticos técnicos de relaciones fallidas.",
+    challenge_type: ChallengeType.DUET,
+    partner_selection: "choose",
   },
   {
     card_title: "🎭 El Meme que Tu Ex No Verá 🧠😭",
@@ -174,6 +186,7 @@ export const PREDEFINED_CARDS: EmotionalCardModel[] = [
     emotional_tone: EmotionalTone.CAOS_ROMANTICO,
     stylistic_language: StylisticLanguage.TERAPIA_MEME,
     sticker_integration: "Ganas el sticker 🧸 Chicle Emocional al crear un meme que active risa + ternura colectiva.",
+    challenge_type: ChallengeType.GROUP,
   },
   {
     card_title: "🎵 La Playlist que Nunca Le Dedicaste 🔥",
@@ -188,12 +201,14 @@ export const PREDEFINED_CARDS: EmotionalCardModel[] = [
     },
     ai_backup_response:
       "Coach de Rupturas analiza: 'Tu playlist indica Síndrome de Apego Tóxico v2.0: 40% despecho, 30% nostalgia, 30% 'soy adicta al dolor'. Recomendación: Añade una canción de empoderamiento y borra 'Despacito' de tu vida.'",
-    social_trigger: "Si el diagnóstico del grupo coincide con tu situación real, desbloqueas la cortesía.",
+    social_trigger:
+      "Comparte tu playlist en redes y etiqueta al menos a dos amigos. Si alguien comenta en 24 horas, desbloqueas la cortesía.",
     reward: "Playlist digital: 'Soundtrack de mi Ex' + filtro AR de 'Playlist Killer'.",
     narrative_voice: NarrativeVoice.BOT_SARCASTICO,
     emotional_tone: EmotionalTone.CAOS_ROMANTICO,
     stylistic_language: StylisticLanguage.IRONIA_CRUDA,
     sticker_integration: "Ganas el sticker 🧨 Causa Caos si tu playlist incluye >3 canciones de despecho en 1 minuto.",
+    challenge_type: ChallengeType.INDIVIDUAL,
   },
   {
     card_title: "💬 El Mensaje que Nunca Enviaste 📱💔",
@@ -215,6 +230,8 @@ export const PREDEFINED_CARDS: EmotionalCardModel[] = [
     stylistic_language: StylisticLanguage.EMOJIS_SPANGLISH,
     sticker_integration:
       "Ganas el sticker 💬 Texto Mal Mandado si tu mensaje incluye >3 errores ortográficos y un 'jeje' final.",
+    challenge_type: ChallengeType.DUET,
+    partner_selection: "random",
   },
 ]
 
