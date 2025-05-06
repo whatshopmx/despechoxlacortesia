@@ -34,6 +34,7 @@ import {
   PartyPopper,
   Sparkles,
   Flame,
+  ImageIcon,
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -55,6 +56,11 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
 import { getComboByStickers } from "@/lib/card-models"
+
+// Importar los nuevos componentes y servicios al inicio del archivo:
+import { MemeGenerator } from "./meme-generator"
+import { SoundControls } from "./sound-controls"
+import { playSound } from "@/services/sound-effects"
 
 // New typed interfaces for our challenge system
 interface Player {
@@ -137,6 +143,14 @@ export function GroupChallengeFlow({ initialPlayers, cards, brandInfo, onComplet
   const [showAiHelp, setShowAiHelp] = useState(false)
   const [showStickerCombo, setShowStickerCombo] = useState(false)
   const [unlockedCombo, setUnlockedCombo] = useState<StickerCombo | null>(null)
+
+  // Añadir nuevos estados para las funcionalidades de memes y animaciones:
+  const [showMemeGenerator, setShowMemeGenerator] = useState<boolean>(false)
+  const [memeGeneratorText, setMemeGeneratorText] = useState<string>("")
+  const [generatedMemeUrl, setGeneratedMemeUrl] = useState<string | null>(null)
+  const [animateCard, setAnimateCard] = useState<boolean>(false)
+  const [animateButton, setAnimateButton] = useState<boolean>(false)
+  const [animateReward, setAnimateReward] = useState<boolean>(false)
 
   // State for verification methods
   const [photoData, setPhotoData] = useState<string | null>(null)
@@ -253,6 +267,27 @@ export function GroupChallengeFlow({ initialPlayers, cards, brandInfo, onComplet
     moveToNextPlayer("timeout")
   }
 
+  // Función para reproducir sonidos
+  const playSoundEffect = (
+    effect:
+      | "success"
+      | "error"
+      | "click"
+      | "card_flip"
+      | "challenge_complete"
+      | "reward"
+      | "social_trigger"
+      | "vote"
+      | "camera"
+      | "countdown"
+      | "magic"
+      | "level_up"
+      | "combo"
+      | "notification",
+  ) => {
+    playSound(effect)
+  }
+
   // Calculate the tier based on completed cards and emotional score
   const calculateTier = (completedCards: number, score: number): "basic" | "intermediate" | "advanced" => {
     if (completedCards >= 3 && score > 70) return "advanced"
@@ -365,6 +400,13 @@ export function GroupChallengeFlow({ initialPlayers, cards, brandInfo, onComplet
     try {
       completeChallenge()
 
+      // Reproducir sonido de completado
+      playSoundEffect("challenge_complete")
+
+      // Añadir animación
+      setAnimateButton(true)
+      setTimeout(() => setAnimateButton(false), 500)
+
       // If verification is required, show the appropriate verification UI
       if (verificationMethod === "self") {
         // Self-verification doesn't require additional steps
@@ -382,6 +424,9 @@ export function GroupChallengeFlow({ initialPlayers, cards, brandInfo, onComplet
     } catch (err) {
       console.error("Error completing challenge:", err)
       setVerificationError("Error al completar el reto. Por favor, intenta de nuevo.")
+
+      // Reproducir sonido de error
+      playSoundEffect("error")
     }
   }
 
@@ -596,6 +641,9 @@ export function GroupChallengeFlow({ initialPlayers, cards, brandInfo, onComplet
       ])
     }
 
+    // Reproducir sonido de voto
+    playSoundEffect("vote")
+
     // Show toast notification
     const player = players.find((p) => p.id === playerId)
     const voteMessages = {
@@ -807,10 +855,27 @@ export function GroupChallengeFlow({ initialPlayers, cards, brandInfo, onComplet
   const handleClaimReward = () => {
     try {
       claimReward()
+
+      // Reproducir sonido de recompensa
+      playSoundEffect("reward")
+
+      // Añadir animación
+      setAnimateReward(true)
+      setTimeout(() => setAnimateReward(false), 800)
+
+      // Mostrar generador de memes si es apropiado
+      if (challengeType === "individual" || challengeType === "duet") {
+        setMemeGeneratorText(textVerification || "¡He completado el reto!")
+        setShowMemeGenerator(true)
+      }
+
       moveToNextPlayer("completed")
     } catch (err) {
       console.error("Error claiming reward:", err)
       setVerificationError("Ocurrió un error al reclamar la recompensa. Por favor, intenta de nuevo.")
+
+      // Reproducir sonido de error
+      playSoundEffect("error")
     }
   }
 
@@ -1255,9 +1320,23 @@ export function GroupChallengeFlow({ initialPlayers, cards, brandInfo, onComplet
             </div>
           )}
 
+          {/* Añadir botón para crear meme */}
+          <Button
+            onClick={() => {
+              setMemeGeneratorText(textVerification || "¡He completado el reto!")
+              setShowMemeGenerator(true)
+              playSoundEffect("click")
+            }}
+            variant="outline"
+            className="w-full flex items-center justify-center gap-2 mb-2"
+          >
+            <ImageIcon className="h-4 w-4" />
+            Crear Meme para Compartir
+          </Button>
+
           <Button
             onClick={handleClaimReward}
-            className="w-full bg-gradient-to-r from-amber-500 to-yellow-500 hover:opacity-90"
+            className={`w-full bg-gradient-to-r from-amber-500 to-yellow-500 hover:opacity-90 ${animateReward ? "animate-bounce" : ""}`}
           >
             <Award className="mr-2 h-4 w-4" />
             Reclamar Recompensa y Pasar Turno
@@ -1294,6 +1373,10 @@ export function GroupChallengeFlow({ initialPlayers, cards, brandInfo, onComplet
     }
   }
 
+  const handleMemeGenerated = (url: string | null) => {
+    setGeneratedMemeUrl(url)
+  }
+
   return (
     <div className="flex flex-col md:flex-row min-h-screen bg-background">
       {/* Mobile drawer for sidebar */}
@@ -1319,6 +1402,7 @@ export function GroupChallengeFlow({ initialPlayers, cards, brandInfo, onComplet
           <span className="hidden sm:inline">Ver Recompensas</span>
           <span className="sm:hidden">Recompensas</span>
         </Button>
+        <SoundControls className="ml-2" />
       </div>
 
       {/* Sidebar with player info and brand details */}
@@ -1480,7 +1564,7 @@ export function GroupChallengeFlow({ initialPlayers, cards, brandInfo, onComplet
                   <div className="mt-4 flex gap-2">
                     <Button
                       onClick={handleCompleteChallenge}
-                      className="flex-1 bg-gradient-to-r from-pink-500 to-purple-500 hover:opacity-90"
+                      className={`flex-1 bg-gradient-to-r from-pink-500 to-purple-500 hover:opacity-90 ${animateButton ? "animate-pulse" : ""}`}
                       disabled={challengeStatus !== "in-progress"}
                     >
                       {challengeStatus === "in-progress" ? (
@@ -1828,6 +1912,26 @@ export function GroupChallengeFlow({ initialPlayers, cards, brandInfo, onComplet
               }))}
               brandInfo={brandInfo}
               onClose={() => setShowRewardsSummary(false)}
+            />
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Meme Generator Dialog */}
+      {showMemeGenerator && (
+        <Dialog open={showMemeGenerator} onOpenChange={setShowMemeGenerator}>
+          <DialogContent className="max-w-4xl">
+            <MemeGenerator
+              initialText={memeGeneratorText}
+              initialCategory={
+                currentCard?.emotional_tier === "chaotic"
+                  ? "fiesta"
+                  : currentCard?.emotional_tier === "intense"
+                    ? "despecho"
+                    : "general"
+              }
+              onMemeGenerated={handleMemeGenerated}
+              onClose={() => setShowMemeGenerator(false)}
             />
           </DialogContent>
         </Dialog>
