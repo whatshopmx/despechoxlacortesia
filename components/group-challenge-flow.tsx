@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button"
 import { EmotionalCard } from "@/components/emotional-card"
 import { Progress } from "@/components/ui/progress"
 import { Textarea } from "@/components/ui/textarea"
+import { AIsuggestion } from "@/components/ai-suggestion"
 import {
   Camera,
   Mic,
@@ -24,6 +25,9 @@ import {
   User,
   UserPlus,
   HelpCircle,
+  Share2,
+  Copy,
+  Lightbulb,
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -43,6 +47,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { useToast } from "@/hooks/use-toast"
 
 // New typed interfaces for our challenge system
 interface Player {
@@ -88,6 +93,7 @@ export function GroupChallengeFlow({ initialPlayers, cards, brandInfo, onComplet
   } = useChallenge()
 
   const router = useRouter()
+  const { toast } = useToast()
 
   // State for players and turn management
   const [players, setPlayers] = useState<Player[]>(initialPlayers)
@@ -102,6 +108,9 @@ export function GroupChallengeFlow({ initialPlayers, cards, brandInfo, onComplet
   const [showPartnerSelection, setShowPartnerSelection] = useState(false)
   const [selectedPartner, setSelectedPartner] = useState<string | null>(null)
   const [groupParticipation, setGroupParticipation] = useState<Record<string, boolean>>({})
+  const [showShareDialog, setShowShareDialog] = useState(false)
+  const [sessionLink, setSessionLink] = useState<string>("")
+  const [showAiHelp, setShowAiHelp] = useState(false)
 
   // State for verification methods
   const [photoData, setPhotoData] = useState<string | null>(null)
@@ -127,6 +136,14 @@ export function GroupChallengeFlow({ initialPlayers, cards, brandInfo, onComplet
   // Determine challenge type
   const challengeType: ChallengeType = currentCard?.challenge_type || "individual"
   const partnerSelectionType = currentCard?.partner_selection || "random"
+
+  // Generate session link
+  useEffect(() => {
+    // In a real app, this would be a unique ID from the database
+    const sessionId = `session_${Math.random().toString(36).substring(2, 9)}`
+    const baseUrl = window.location.origin
+    setSessionLink(`${baseUrl}/experience/social/group/join?id=${sessionId}`)
+  }, [])
 
   // Start the challenge when the component mounts
   useEffect(() => {
@@ -219,6 +236,7 @@ export function GroupChallengeFlow({ initialPlayers, cards, brandInfo, onComplet
     setIsInitialized(false)
     setSelectedPartner(null)
     setGroupParticipation({})
+    setShowAiHelp(false)
 
     // Update players array
     setPlayers((prevPlayers) => {
@@ -266,6 +284,7 @@ export function GroupChallengeFlow({ initialPlayers, cards, brandInfo, onComplet
       setIsInitialized(false)
       setSelectedPartner(null)
       setGroupParticipation({})
+      setShowAiHelp(false)
 
       // Update all players' turn status
       setPlayers((prevPlayers) => {
@@ -641,6 +660,20 @@ export function GroupChallengeFlow({ initialPlayers, cards, brandInfo, onComplet
     setVerificationError(null)
   }
 
+  // Copy session link to clipboard
+  const copySessionLink = () => {
+    navigator.clipboard.writeText(sessionLink)
+    toast({
+      title: "¡Enlace copiado!",
+      description: "El enlace de la sesión ha sido copiado al portapapeles.",
+    })
+  }
+
+  // Toggle AI help
+  const toggleAiHelp = () => {
+    setShowAiHelp(!showAiHelp)
+  }
+
   // Render verification UI based on method
   const renderVerificationUI = () => {
     switch (verificationMethod) {
@@ -912,8 +945,13 @@ export function GroupChallengeFlow({ initialPlayers, cards, brandInfo, onComplet
         </Button>
       </div>
 
-      {/* Button to show rewards summary */}
-      <div className="mb-4 flex justify-end">
+      {/* Button to show rewards summary and share session */}
+      <div className="mb-4 flex justify-end gap-2">
+        <Button variant="outline" className="flex items-center gap-2" onClick={() => setShowShareDialog(true)}>
+          <Share2 className="h-4 w-4" />
+          <span className="hidden sm:inline">Compartir Sesión</span>
+          <span className="sm:hidden">Compartir</span>
+        </Button>
         <Button variant="outline" className="flex items-center gap-2" onClick={() => setShowRewardsSummary(true)}>
           <Award className="h-4 w-4" />
           <span className="hidden sm:inline">Ver Recompensas</span>
@@ -1058,6 +1096,25 @@ export function GroupChallengeFlow({ initialPlayers, cards, brandInfo, onComplet
                     onReaction={(type) => console.log("Reaction:", type)}
                   />
 
+                  {/* AI Help Button */}
+                  <div className="mt-4 mb-2">
+                    <Button
+                      variant="outline"
+                      className="w-full flex items-center justify-center gap-2"
+                      onClick={toggleAiHelp}
+                    >
+                      <Lightbulb className="h-4 w-4" />
+                      {showAiHelp ? "Ocultar ayuda de IA" : "Mostrar ayuda de IA"}
+                    </Button>
+                  </div>
+
+                  {/* AI Suggestion */}
+                  {showAiHelp && currentCard.ai_backup_response && (
+                    <div className="mb-4">
+                      <AIsuggestion suggestion={currentCard.ai_backup_response} onClose={() => setShowAiHelp(false)} />
+                    </div>
+                  )}
+
                   <div className="mt-4 flex gap-2">
                     <Button
                       onClick={handleCompleteChallenge}
@@ -1148,6 +1205,41 @@ export function GroupChallengeFlow({ initialPlayers, cards, brandInfo, onComplet
             <Button onClick={handlePartnerConfirm} disabled={!selectedPartner}>
               Confirmar
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Share Session Dialog */}
+      <Dialog open={showShareDialog} onOpenChange={setShowShareDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Compartir Sesión</DialogTitle>
+            <DialogDescription>Comparte este enlace con tus amigos para que se unan a la sesión.</DialogDescription>
+          </DialogHeader>
+
+          <div className="py-4">
+            <div className="flex items-center space-x-2">
+              <input type="text" value={sessionLink} readOnly className="flex-1 px-3 py-2 border rounded-md text-sm" />
+              <Button size="icon" onClick={copySessionLink}>
+                <Copy className="h-4 w-4" />
+              </Button>
+            </div>
+            <div className="mt-4 flex justify-center">
+              <div className="bg-white p-4 rounded-lg border">
+                <img
+                  src={`/placeholder.svg?height=200&width=200&text=QR+Code`}
+                  alt="QR Code"
+                  className="w-40 h-40 object-contain"
+                />
+              </div>
+            </div>
+            <p className="text-center text-sm text-muted-foreground mt-2">
+              Escanea este código QR para unirte a la sesión
+            </p>
+          </div>
+
+          <DialogFooter>
+            <Button onClick={() => setShowShareDialog(false)}>Cerrar</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

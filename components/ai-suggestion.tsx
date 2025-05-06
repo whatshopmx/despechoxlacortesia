@@ -12,7 +12,7 @@ interface AiSuggestionProps {
   onClose: () => void
 }
 
-export function AiSuggestion({ narrativeVoice, suggestion, onClose }: AiSuggestionProps) {
+export function AIsuggestion({ narrativeVoice, suggestion, onClose }: AiSuggestionProps) {
   const [copied, setCopied] = useState(false)
 
   const copyToClipboard = () => {

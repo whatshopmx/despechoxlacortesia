@@ -18,6 +18,7 @@ import {
 import { QRCodeSVG } from "qrcode.react"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Progress } from "@/components/ui/progress"
+import { useMediaQuery } from "@/hooks/use-media-query"
 
 // Define types for our rewards
 interface RewardType {
@@ -57,6 +58,7 @@ export function GroupRewardsSummary({ players, brandInfo, onClose }: GroupReward
   const [selectedReward, setSelectedReward] = useState<RewardType | null>(null)
   const [redeemDialogOpen, setRedeemDialogOpen] = useState(false)
   const [redeemError, setRedeemError] = useState<string | null>(null)
+  const isMobile = useMediaQuery("(max-width: 768px)")
 
   // Get all rewards from all players
   const allRewards = players.flatMap((player) => player.rewards)
@@ -175,7 +177,7 @@ export function GroupRewardsSummary({ players, brandInfo, onClose }: GroupReward
                   <AvatarImage src={player.avatar || "/placeholder.svg"} />
                   <AvatarFallback>{player.name[0]}</AvatarFallback>
                 </Avatar>
-                <span>{player.name}</span>
+                <span className={isMobile ? "hidden" : "inline"}>{player.name}</span>
                 <Badge variant="secondary" className="ml-1 text-xs">
                   {player.rewards.length}
                 </Badge>
@@ -203,18 +205,33 @@ export function GroupRewardsSummary({ players, brandInfo, onClose }: GroupReward
           </CardHeader>
           <CardContent>
             <Tabs defaultValue="all">
-              <TabsList className="grid w-full grid-cols-4">
+              <TabsList className={`grid w-full ${isMobile ? "grid-cols-2" : "grid-cols-4"}`}>
                 <TabsTrigger value="all">Todos ({selectedPlayer.rewards.length})</TabsTrigger>
                 <TabsTrigger value="digital">
                   Digital ({selectedPlayer.rewards.filter((r) => r.type === "digital").length})
                 </TabsTrigger>
-                <TabsTrigger value="physical">
-                  Físico ({selectedPlayer.rewards.filter((r) => r.type === "physical").length})
-                </TabsTrigger>
-                <TabsTrigger value="experience">
-                  Experiencia ({selectedPlayer.rewards.filter((r) => r.type === "experience").length})
-                </TabsTrigger>
+                {!isMobile && (
+                  <TabsTrigger value="physical">
+                    Físico ({selectedPlayer.rewards.filter((r) => r.type === "physical").length})
+                  </TabsTrigger>
+                )}
+                {!isMobile && (
+                  <TabsTrigger value="experience">
+                    Experiencia ({selectedPlayer.rewards.filter((r) => r.type === "experience").length})
+                  </TabsTrigger>
+                )}
               </TabsList>
+
+              {isMobile && (
+                <TabsList className="grid w-full grid-cols-2 mt-2">
+                  <TabsTrigger value="physical">
+                    Físico ({selectedPlayer.rewards.filter((r) => r.type === "physical").length})
+                  </TabsTrigger>
+                  <TabsTrigger value="experience">
+                    Experiencia ({selectedPlayer.rewards.filter((r) => r.type === "experience").length})
+                  </TabsTrigger>
+                </TabsList>
+              )}
 
               <TabsContent value="all" className="mt-4 space-y-4">
                 {selectedPlayer.rewards.length === 0 ? (
@@ -295,12 +312,19 @@ export function GroupRewardsSummary({ players, brandInfo, onClose }: GroupReward
         </CardHeader>
         <CardContent>
           <Tabs defaultValue="all">
-            <TabsList className="grid w-full grid-cols-4">
+            <TabsList className={`grid w-full ${isMobile ? "grid-cols-2" : "grid-cols-4"}`}>
               <TabsTrigger value="all">Todos ({allRewards.length})</TabsTrigger>
               <TabsTrigger value="digital">Digital ({digitalRewards.length})</TabsTrigger>
-              <TabsTrigger value="physical">Físico ({physicalRewards.length})</TabsTrigger>
-              <TabsTrigger value="experience">Experiencia ({experienceRewards.length})</TabsTrigger>
+              {!isMobile && <TabsTrigger value="physical">Físico ({physicalRewards.length})</TabsTrigger>}
+              {!isMobile && <TabsTrigger value="experience">Experiencia ({experienceRewards.length})</TabsTrigger>}
             </TabsList>
+
+            {isMobile && (
+              <TabsList className="grid w-full grid-cols-2 mt-2">
+                <TabsTrigger value="physical">Físico ({physicalRewards.length})</TabsTrigger>
+                <TabsTrigger value="experience">Experiencia ({experienceRewards.length})</TabsTrigger>
+              </TabsList>
+            )}
 
             <TabsContent value="all" className="mt-4 space-y-4">
               {allRewards.length === 0 ? (
