@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import type { Card } from "@/lib/card-generator-pipeline-enhanced"
-import type { ChallengeType } from "@/lib/card-models"
+import type { ChallengeType, StickerType, StickerCombo } from "@/lib/card-models"
 import { useChallenge } from "@/contexts/challenge-context"
 import { Button } from "@/components/ui/button"
 import { EmotionalCard } from "@/components/emotional-card"
@@ -28,6 +28,12 @@ import {
   Share2,
   Copy,
   Lightbulb,
+  Heart,
+  Skull,
+  ThumbsUp,
+  PartyPopper,
+  Sparkles,
+  Flame,
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -48,6 +54,7 @@ import {
 } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
+import { getComboByStickers } from "@/lib/card-models"
 
 // New typed interfaces for our challenge system
 interface Player {
@@ -59,6 +66,8 @@ interface Player {
   emotionalScore: number
   currentTurn: boolean
   assignedCards: Card[]
+  stickers?: StickerType[]
+  unlockedCombos?: string[]
 }
 
 interface BrandInfo {
@@ -72,6 +81,15 @@ interface GroupChallengeFlowProps {
   cards: Card[]
   brandInfo: BrandInfo
   onComplete?: () => void
+}
+
+// Vote types for group verification
+type VoteType = "heart" | "skull" | "thumbsUp" | "party" | "fire"
+
+interface Vote {
+  playerId: string
+  voteType: VoteType
+  timestamp: number
 }
 
 export function GroupChallengeFlow({ initialPlayers, cards, brandInfo, onComplete }: GroupChallengeFlowProps) {
@@ -96,7 +114,13 @@ export function GroupChallengeFlow({ initialPlayers, cards, brandInfo, onComplet
   const { toast } = useToast()
 
   // State for players and turn management
-  const [players, setPlayers] = useState<Player[]>(initialPlayers)
+  const [players, setPlayers] = useState<Player[]>(
+    initialPlayers.map((player) => ({
+      ...player,
+      stickers: player.stickers || [],
+      unlockedCombos: player.unlockedCombos || [],
+    })),
+  )
   const [currentPlayerIndex, setCurrentPlayerIndex] = useState<number>(0)
   const [activeTab, setActiveTab] = useState<string>("challenge")
   const [isInitialized, setIsInitialized] = useState(false)
@@ -111,12 +135,14 @@ export function GroupChallengeFlow({ initialPlayers, cards, brandInfo, onComplet
   const [showShareDialog, setShowShareDialog] = useState(false)
   const [sessionLink, setSessionLink] = useState<string>("")
   const [showAiHelp, setShowAiHelp] = useState(false)
+  const [showStickerCombo, setShowStickerCombo] = useState(false)
+  const [unlockedCombo, setUnlockedCombo] = useState<StickerCombo | null>(null)
 
   // State for verification methods
   const [photoData, setPhotoData] = useState<string | null>(null)
   const [isRecording, setIsRecording] = useState(false)
   const [audioData, setAudioData] = useState<Blob | null>(null)
-  const [groupVotes, setGroupVotes] = useState<number>(0)
+  const [groupVotes, setGroupVotes] = useState<Vote[]>([])
 
   // State for turn timer
   const [remainingTime, setRemainingTime] = useState<number>(60) // 60 seconds per turn
@@ -136,6 +162,17 @@ export function GroupChallengeFlow({ initialPlayers, cards, brandInfo, onComplet
   // Determine challenge type
   const challengeType: ChallengeType = currentCard?.challenge_type || "individual"
   const partnerSelectionType = currentCard?.partner_selection || "random"
+
+  // Calculate verification threshold based on number of participants
+  const getVerificationThreshold = () => {
+    const participantCount = Object.values(groupParticipation).filter(Boolean).length
+    // For small groups (2-3 people), require all participants
+    // For medium groups (4-6 people), require 75% of participants
+    // For large groups (7+ people), require 60% of participants
+    if (participantCount <= 3) return participantCount
+    if (participantCount <= 6) return Math.ceil(participantCount * 0.75)
+    return Math.ceil(participantCount * 0.6)
+  }
 
   // Generate session link
   useEffect(() => {
@@ -230,7 +267,7 @@ export function GroupChallengeFlow({ initialPlayers, cards, brandInfo, onComplet
     setActiveTab("challenge")
     setPhotoData(null)
     setAudioData(null)
-    setGroupVotes(0)
+    setGroupVotes([])
     setTextVerification("")
     resetChallenge()
     setIsInitialized(false)
@@ -278,7 +315,7 @@ export function GroupChallengeFlow({ initialPlayers, cards, brandInfo, onComplet
       setActiveTab("challenge")
       setPhotoData(null)
       setAudioData(null)
-      setGroupVotes(0)
+      setGroupVotes([])
       setTextVerification("")
       resetChallenge()
       setIsInitialized(false)
@@ -531,21 +568,88 @@ export function GroupChallengeFlow({ initialPlayers, cards, brandInfo, onComplet
     }
   }
 
-  // Handle group verification
-  const addGroupVote = () => {
-    setGroupVotes((prev) => prev + 1)
+  // Handle group verification with emoji votes
+  const addGroupVote = (playerId: string, voteType: VoteType) => {
+    // Check if player has already voted
+    const existingVoteIndex = groupVotes.findIndex((vote) => vote.playerId === playerId)
+
+    if (existingVoteIndex !== -1) {
+      // Update existing vote
+      setGroupVotes((prev) => {
+        const newVotes = [...prev]
+        newVotes[existingVoteIndex] = {
+          playerId,
+          voteType,
+          timestamp: Date.now(),
+        }
+        return newVotes
+      })
+    } else {
+      // Add new vote
+      setGroupVotes((prev) => [
+        ...prev,
+        {
+          playerId,
+          voteType,
+          timestamp: Date.now(),
+        },
+      ])
+    }
+
+    // Show toast notification
+    const player = players.find((p) => p.id === playerId)
+    const voteMessages = {
+      heart: "¡Le encantó!",
+      skull: "No le convenció...",
+      thumbsUp: "¡Aprobado!",
+      party: "¡Fiesta total!",
+      fire: "¡Fuego puro!",
+    }
+
+    toast({
+      title: `${player?.name} ha votado`,
+      description: voteMessages[voteType],
+      duration: 2000,
+    })
+  }
+
+  const getPositiveVotesCount = () => {
+    // Count positive votes (heart, thumbsUp, party, fire)
+    return groupVotes.filter(
+      (vote) =>
+        vote.voteType === "heart" ||
+        vote.voteType === "thumbsUp" ||
+        vote.voteType === "party" ||
+        vote.voteType === "fire",
+    ).length
+  }
+
+  const getNegativeVotesCount = () => {
+    // Count negative votes (skull)
+    return groupVotes.filter((vote) => vote.voteType === "skull").length
   }
 
   const handleGroupVerification = async () => {
     try {
-      // For group verification, we need a threshold (e.g., 3 votes)
-      const threshold = 3
-      const success = await submitGroupVerification(groupVotes, threshold)
+      // Calculate threshold based on number of participants
+      const threshold = getVerificationThreshold()
+      const positiveVotes = getPositiveVotesCount()
+
+      // Verification succeeds if positive votes >= threshold
+      const success = positiveVotes >= threshold
 
       if (success) {
+        await verifyChallenge("group", { votes: positiveVotes, threshold })
         updatePlayerProgress("group")
         setShowConfetti(true)
         setTimeout(() => setShowConfetti(false), 3000)
+      } else {
+        // Failed verification
+        toast({
+          title: "Verificación fallida",
+          description: `Necesitas al menos ${threshold} votos positivos para completar el reto.`,
+          variant: "destructive",
+        })
       }
 
       setActiveTab("result")
@@ -553,6 +657,17 @@ export function GroupChallengeFlow({ initialPlayers, cards, brandInfo, onComplet
       console.error("Error submitting group verification:", err)
       setVerificationError("Ocurrió un error al enviar la verificación. Por favor, intenta de nuevo.")
     }
+  }
+
+  // Check if a player has already voted
+  const hasPlayerVoted = (playerId: string) => {
+    return groupVotes.some((vote) => vote.playerId === playerId)
+  }
+
+  // Get a player's vote type
+  const getPlayerVoteType = (playerId: string): VoteType | null => {
+    const vote = groupVotes.find((vote) => vote.playerId === playerId)
+    return vote ? vote.voteType : null
   }
 
   // Update player progress after successful verification
@@ -584,6 +699,53 @@ export function GroupChallengeFlow({ initialPlayers, cards, brandInfo, onComplet
       // Remove the completed card from assignedCards
       const remainingCards = player.assignedCards.filter((card) => card.card_id !== currentCard?.card_id)
 
+      // Add sticker if card has sticker_integration
+      const updatedStickers = [...(player.stickers || [])]
+      if (currentCard?.sticker_integration) {
+        // Extract sticker type from the integration text
+        // This is a simplified approach - in a real app, you'd have a more structured way to define stickers
+        const stickerMatch = currentCard.sticker_integration.match(/sticker\s+([🎤💔🤡💬🧨💃🧸🚩🎭🧠🫣🫦🦁])/u)
+        if (stickerMatch && stickerMatch[1]) {
+          const emojiToStickerType: Record<string, StickerType> = {
+            "🎤": StickerType.VOZ_TELENOVELA,
+            "💔": StickerType.CORAZON_ROTO,
+            "🤡": StickerType.PAYASO_OFICIAL,
+            "💬": StickerType.TEXTO_MAL_MANDADO,
+            "🧨": StickerType.CAUSA_CAOS,
+            "💃": StickerType.VERGUENZA_AJENA,
+            "🧸": StickerType.CHICLE_EMOCIONAL,
+            "🚩": StickerType.RED_FLAG_FLAG,
+            "🎭": StickerType.MODO_DRAMATICA,
+            "🧠": StickerType.SOBREPENSAR,
+            "🫣": StickerType.FACEPALM_TOTAL,
+            "🫦": StickerType.TENSION_GENERADA,
+            "🦁": StickerType.RUGIDO_INTERNO,
+          }
+
+          const stickerType = emojiToStickerType[stickerMatch[1]]
+          if (stickerType && !updatedStickers.includes(stickerType)) {
+            updatedStickers.push(stickerType)
+
+            // Show toast notification for new sticker
+            toast({
+              title: "¡Nuevo sticker desbloqueado!",
+              description: `Has conseguido el sticker ${stickerMatch[1]} ${stickerType}`,
+              duration: 3000,
+            })
+          }
+        }
+      }
+
+      // Check for sticker combos
+      const combo = getComboByStickers(updatedStickers)
+      const updatedCombos = [...(player.unlockedCombos || [])]
+
+      if (combo && !updatedCombos.includes(combo.nombre_combo)) {
+        updatedCombos.push(combo.nombre_combo)
+        setUnlockedCombo(combo)
+        setShowStickerCombo(true)
+      }
+
       // Update the current player
       updatedPlayers[currentPlayerIndex] = {
         ...player,
@@ -591,6 +753,8 @@ export function GroupChallengeFlow({ initialPlayers, cards, brandInfo, onComplet
         emotionalScore,
         tier,
         assignedCards: remainingCards,
+        stickers: updatedStickers,
+        unlockedCombos: updatedCombos,
       }
 
       // For duet challenges, also update the partner's progress
@@ -674,6 +838,42 @@ export function GroupChallengeFlow({ initialPlayers, cards, brandInfo, onComplet
     setShowAiHelp(!showAiHelp)
   }
 
+  // Get vote button color based on vote type
+  const getVoteButtonColor = (voteType: VoteType) => {
+    switch (voteType) {
+      case "heart":
+        return "bg-pink-100 hover:bg-pink-200 text-pink-600"
+      case "skull":
+        return "bg-gray-100 hover:bg-gray-200 text-gray-600"
+      case "thumbsUp":
+        return "bg-blue-100 hover:bg-blue-200 text-blue-600"
+      case "party":
+        return "bg-purple-100 hover:bg-purple-200 text-purple-600"
+      case "fire":
+        return "bg-orange-100 hover:bg-orange-200 text-orange-600"
+      default:
+        return "bg-gray-100 hover:bg-gray-200 text-gray-600"
+    }
+  }
+
+  // Get vote icon based on vote type
+  const getVoteIcon = (voteType: VoteType) => {
+    switch (voteType) {
+      case "heart":
+        return <Heart className="h-5 w-5" />
+      case "skull":
+        return <Skull className="h-5 w-5" />
+      case "thumbsUp":
+        return <ThumbsUp className="h-5 w-5" />
+      case "party":
+        return <PartyPopper className="h-5 w-5" />
+      case "fire":
+        return <Flame className="h-5 w-5" />
+      default:
+        return <ThumbsUp className="h-5 w-5" />
+    }
+  }
+
   // Render verification UI based on method
   const renderVerificationUI = () => {
     switch (verificationMethod) {
@@ -704,7 +904,10 @@ export function GroupChallengeFlow({ initialPlayers, cards, brandInfo, onComplet
 
             <div className="flex justify-center gap-4">
               {!photoData ? (
-                <Button onClick={capturePhoto}>
+                <Button
+                  onClick={capturePhoto}
+                  className="bg-gradient-to-r from-pink-500 to-purple-500 hover:opacity-90"
+                >
                   <Camera className="mr-2 h-4 w-4" />
                   Capturar Foto
                 </Button>
@@ -713,7 +916,10 @@ export function GroupChallengeFlow({ initialPlayers, cards, brandInfo, onComplet
                   <Button variant="outline" onClick={() => setPhotoData(null)}>
                     Volver a Capturar
                   </Button>
-                  <Button onClick={submitPhotoVerification}>
+                  <Button
+                    onClick={submitPhotoVerification}
+                    className="bg-gradient-to-r from-green-500 to-emerald-500 hover:opacity-90"
+                  >
                     <CheckCircle className="mr-2 h-4 w-4" />
                     Enviar Verificación
                   </Button>
@@ -745,7 +951,10 @@ export function GroupChallengeFlow({ initialPlayers, cards, brandInfo, onComplet
 
             <div className="flex justify-center gap-4">
               {!isRecording && !audioData ? (
-                <Button onClick={startRecording}>
+                <Button
+                  onClick={startRecording}
+                  className="bg-gradient-to-r from-blue-500 to-teal-500 hover:opacity-90"
+                >
                   <Mic className="mr-2 h-4 w-4" />
                   Iniciar Grabación
                 </Button>
@@ -764,7 +973,10 @@ export function GroupChallengeFlow({ initialPlayers, cards, brandInfo, onComplet
                   >
                     Volver a Grabar
                   </Button>
-                  <Button onClick={submitAudioVerification}>
+                  <Button
+                    onClick={submitAudioVerification}
+                    className="bg-gradient-to-r from-green-500 to-emerald-500 hover:opacity-90"
+                  >
                     <CheckCircle className="mr-2 h-4 w-4" />
                     Enviar Verificación
                   </Button>
@@ -775,51 +987,177 @@ export function GroupChallengeFlow({ initialPlayers, cards, brandInfo, onComplet
         )
 
       case "group":
+        const threshold = getVerificationThreshold()
+        const positiveVotes = getPositiveVotesCount()
+        const negativeVotes = getNegativeVotesCount()
+
         return (
           <div className="space-y-4">
             <h3 className="text-lg font-medium">Verificación grupal</h3>
             <p className="text-sm text-gray-500">
-              Necesitas que al menos 3 personas confirmen que has completado el reto.
+              Necesitas que al menos {threshold} personas confirmen que has completado el reto.
             </p>
 
-            <div className="bg-gray-100 p-4 rounded-lg">
+            <div className="bg-gradient-to-r from-pink-50 to-purple-50 p-4 rounded-lg border border-pink-200">
               <div className="flex justify-between items-center">
-                <span className="font-medium">Votos recibidos:</span>
-                <Badge variant="secondary">{groupVotes} / 3</Badge>
+                <span className="font-medium">Votos positivos:</span>
+                <Badge variant="secondary" className="bg-green-100 text-green-800">
+                  {positiveVotes} / {threshold}
+                </Badge>
               </div>
-              <Progress value={(groupVotes / 3) * 100} className="h-2 mt-2" />
+              <Progress
+                value={(positiveVotes / threshold) * 100}
+                className="h-2 mt-2 bg-pink-200"
+                indicatorClassName="bg-gradient-to-r from-pink-500 to-purple-500"
+              />
+
+              <div className="flex justify-between items-center mt-3">
+                <span className="font-medium">Votos negativos:</span>
+                <Badge variant="secondary" className="bg-red-100 text-red-800">
+                  {negativeVotes}
+                </Badge>
+              </div>
             </div>
 
-            <div className="flex flex-wrap gap-2">
-              {players
-                .filter((p) => p.id !== currentPlayer.id)
-                .map((player) => (
-                  <TooltipProvider key={player.id}>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="rounded-full h-12 w-12 p-0"
-                          onClick={addGroupVote}
-                        >
-                          <Avatar className="h-10 w-10">
+            <div className="grid grid-cols-2 gap-3 mt-4">
+              <div>
+                <h4 className="text-sm font-medium mb-2">Jugadores</h4>
+                <div className="space-y-2">
+                  {players
+                    .filter((p) => p.id !== currentPlayer.id)
+                    .map((player) => (
+                      <div
+                        key={player.id}
+                        className="flex items-center justify-between p-2 bg-gray-50 rounded-lg border"
+                      >
+                        <div className="flex items-center gap-2">
+                          <Avatar className="h-8 w-8">
                             <AvatarImage src={player.avatar || "/placeholder.svg"} />
                             <AvatarFallback>{player.name[0]}</AvatarFallback>
                           </Avatar>
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>Simular voto de {player.name}</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                ))}
+                          <span className="text-sm">{player.name}</span>
+                        </div>
+                        {hasPlayerVoted(player.id) && (
+                          <Badge className={`${getVoteButtonColor(getPlayerVoteType(player.id) || "thumbsUp")}`}>
+                            {getVoteIcon(getPlayerVoteType(player.id) || "thumbsUp")}
+                          </Badge>
+                        )}
+                      </div>
+                    ))}
+                </div>
+              </div>
+
+              <div>
+                <h4 className="text-sm font-medium mb-2">Votar como...</h4>
+                <div className="space-y-2">
+                  {players
+                    .filter((p) => p.id !== currentPlayer.id)
+                    .map((player) => (
+                      <div key={player.id} className="p-2 bg-gray-50 rounded-lg border">
+                        <div className="flex flex-wrap gap-1">
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className={`${getVoteButtonColor("heart")} ${getPlayerVoteType(player.id) === "heart" ? "ring-2 ring-pink-500" : ""}`}
+                                  onClick={() => addGroupVote(player.id, "heart")}
+                                >
+                                  <Heart className="h-4 w-4" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>Me encanta</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className={`${getVoteButtonColor("thumbsUp")} ${getPlayerVoteType(player.id) === "thumbsUp" ? "ring-2 ring-blue-500" : ""}`}
+                                  onClick={() => addGroupVote(player.id, "thumbsUp")}
+                                >
+                                  <ThumbsUp className="h-4 w-4" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>Apruebo</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className={`${getVoteButtonColor("party")} ${getPlayerVoteType(player.id) === "party" ? "ring-2 ring-purple-500" : ""}`}
+                                  onClick={() => addGroupVote(player.id, "party")}
+                                >
+                                  <PartyPopper className="h-4 w-4" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>¡Fiesta!</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className={`${getVoteButtonColor("fire")} ${getPlayerVoteType(player.id) === "fire" ? "ring-2 ring-orange-500" : ""}`}
+                                  onClick={() => addGroupVote(player.id, "fire")}
+                                >
+                                  <Flame className="h-4 w-4" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>¡Fuego!</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className={`${getVoteButtonColor("skull")} ${getPlayerVoteType(player.id) === "skull" ? "ring-2 ring-gray-500" : ""}`}
+                                  onClick={() => addGroupVote(player.id, "skull")}
+                                >
+                                  <Skull className="h-4 w-4" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>No me convence</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              </div>
             </div>
 
-            <Button onClick={handleGroupVerification} disabled={groupVotes < 3} className="w-full">
+            <Button
+              onClick={handleGroupVerification}
+              disabled={positiveVotes < threshold}
+              className="w-full bg-gradient-to-r from-green-500 to-emerald-500 hover:opacity-90 mt-4"
+            >
               <CheckCircle className="mr-2 h-4 w-4" />
-              Verificar con Grupo
+              Verificar con Grupo ({positiveVotes}/{threshold})
             </Button>
           </div>
         )
@@ -837,7 +1175,11 @@ export function GroupChallengeFlow({ initialPlayers, cards, brandInfo, onComplet
               className="min-h-[120px]"
             />
 
-            <Button onClick={submitTextVerification} className="w-full" disabled={!textVerification.trim()}>
+            <Button
+              onClick={submitTextVerification}
+              className="w-full bg-gradient-to-r from-blue-500 to-teal-500 hover:opacity-90"
+              disabled={!textVerification.trim()}
+            >
               <CheckCircle className="mr-2 h-4 w-4" />
               Enviar Verificación
             </Button>
@@ -896,7 +1238,27 @@ export function GroupChallengeFlow({ initialPlayers, cards, brandInfo, onComplet
             </p>
           </div>
 
-          <Button onClick={handleClaimReward} className="w-full">
+          {/* Stickers section */}
+          {currentPlayer.stickers && currentPlayer.stickers.length > 0 && (
+            <div className="bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-200 rounded-lg p-4">
+              <h3 className="font-medium flex items-center">
+                <Sparkles className="h-5 w-5 text-purple-500 mr-2" />
+                Tus stickers:
+              </h3>
+              <div className="flex flex-wrap gap-2 mt-2">
+                {currentPlayer.stickers.map((sticker) => (
+                  <Badge key={sticker} className="bg-white text-purple-700 border border-purple-200 py-1 px-2">
+                    {sticker}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <Button
+            onClick={handleClaimReward}
+            className="w-full bg-gradient-to-r from-amber-500 to-yellow-500 hover:opacity-90"
+          >
             <Award className="mr-2 h-4 w-4" />
             Reclamar Recompensa y Pasar Turno
           </Button>
@@ -1118,7 +1480,7 @@ export function GroupChallengeFlow({ initialPlayers, cards, brandInfo, onComplet
                   <div className="mt-4 flex gap-2">
                     <Button
                       onClick={handleCompleteChallenge}
-                      className="flex-1"
+                      className="flex-1 bg-gradient-to-r from-pink-500 to-purple-500 hover:opacity-90"
                       disabled={challengeStatus !== "in-progress"}
                     >
                       {challengeStatus === "in-progress" ? (
@@ -1240,6 +1602,57 @@ export function GroupChallengeFlow({ initialPlayers, cards, brandInfo, onComplet
 
           <DialogFooter>
             <Button onClick={() => setShowShareDialog(false)}>Cerrar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Sticker Combo Dialog */}
+      <Dialog open={showStickerCombo} onOpenChange={setShowStickerCombo}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-center text-xl">¡Combo de Stickers Desbloqueado!</DialogTitle>
+            <DialogDescription className="text-center">
+              Has conseguido todos los stickers necesarios para desbloquear un combo especial.
+            </DialogDescription>
+          </DialogHeader>
+
+          {unlockedCombo && (
+            <div className="py-6">
+              <div className="bg-gradient-to-r from-purple-500 to-pink-500 text-white p-4 rounded-lg text-center mb-4">
+                <h3 className="text-xl font-bold">{unlockedCombo.nombre_combo}</h3>
+              </div>
+
+              <div className="bg-gradient-to-r from-purple-50 to-pink-50 p-4 rounded-lg border border-purple-200 mb-4">
+                <h4 className="font-medium mb-2">Stickers necesarios:</h4>
+                <div className="flex flex-wrap gap-2">
+                  {unlockedCombo.stickers_necesarios.map((sticker) => (
+                    <Badge key={sticker} className="bg-white text-purple-700 border border-purple-200 py-1 px-2">
+                      {sticker}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+
+              <div className="bg-gradient-to-r from-amber-50 to-yellow-50 p-4 rounded-lg border border-amber-200 mb-4">
+                <h4 className="font-medium mb-2">Efecto grupal:</h4>
+                <p className="text-amber-800">{unlockedCombo.efecto_grupal}</p>
+              </div>
+
+              <div className="bg-gradient-to-r from-green-50 to-emerald-50 p-4 rounded-lg border border-green-200">
+                <h4 className="font-medium mb-2">Premio:</h4>
+                <p className="text-green-800 font-medium">{unlockedCombo.premio.descripcion}</p>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button
+              onClick={() => setShowStickerCombo(false)}
+              className="w-full bg-gradient-to-r from-purple-500 to-pink-500 hover:opacity-90"
+            >
+              <Sparkles className="mr-2 h-4 w-4" />
+              ¡Genial!
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
