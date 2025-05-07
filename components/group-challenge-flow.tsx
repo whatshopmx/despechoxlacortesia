@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import type { Card } from "@/lib/card-generator-pipeline-enhanced"
-import type { ChallengeType, StickerType, StickerCombo } from "@/lib/card-models"
+import type { ChallengeType } from "@/lib/card-models"
 import { useChallenge } from "@/contexts/challenge-context"
 import { Button } from "@/components/ui/button"
 import { EmotionalCard } from "@/components/emotional-card"
@@ -35,6 +35,7 @@ import {
   Sparkles,
   Flame,
   ImageIcon,
+  Send,
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -57,10 +58,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast"
 import { getComboByStickers } from "@/lib/card-models"
 
-// Importar los nuevos componentes y servicios al inicio del archivo:
+// Importar los nuevos componentes
 import { MemeGenerator } from "./meme-generator"
-import { SoundControls } from "./sound-controls"
-import { playSound } from "@/services/sound-effects"
 
 // New typed interfaces for our challenge system
 interface Player {
@@ -96,6 +95,29 @@ interface Vote {
   playerId: string
   voteType: VoteType
   timestamp: number
+}
+
+// Define StickerType enum
+enum StickerType {
+  VOZ_TELENOVELA = "Voz de Telenovela",
+  CORAZON_ROTO = "Corazón Roto",
+  PAYASO_OFICIAL = "Payaso Oficial",
+  TEXTO_MAL_MANDADO = "Texto Mal Mandado",
+  CAUSA_CAOS = "Causa Caos",
+  VERGUENZA_AJENA = "Vergüenza Ajena",
+  CHICLE_EMOCIONAL = "Chicle Emocional",
+  RED_FLAG_FLAG = "Red Flag Flag",
+  MODO_DRAMATICA = "Modo Dramática",
+  SOBREPENSAR = "Sobrepensar",
+  FACEPALM_TOTAL = "Facepalm Total",
+  TENSION_GENERADA = "Tensión Generada",
+  RUGIDO_INTERNO = "Rugido Interno",
+}
+
+// Dummy playSound function (replace with your actual implementation)
+const playSound = (effect: string) => {
+  console.log(`Playing sound effect: ${effect}`)
+  // Add your sound playing logic here (e.g., using an audio library)
 }
 
 export function GroupChallengeFlow({ initialPlayers, cards, brandInfo, onComplete }: GroupChallengeFlowProps) {
@@ -142,15 +164,18 @@ export function GroupChallengeFlow({ initialPlayers, cards, brandInfo, onComplet
   const [sessionLink, setSessionLink] = useState<string>("")
   const [showAiHelp, setShowAiHelp] = useState(false)
   const [showStickerCombo, setShowStickerCombo] = useState(false)
-  const [unlockedCombo, setUnlockedCombo] = useState<StickerCombo | null>(null)
+  const [unlockedCombo, setUnlockedCombo] = useState<any | null>(null)
 
-  // Añadir nuevos estados para las funcionalidades de memes y animaciones:
+  // Añadir nuevos estados para las funcionalidades de memes
   const [showMemeGenerator, setShowMemeGenerator] = useState<boolean>(false)
   const [memeGeneratorText, setMemeGeneratorText] = useState<string>("")
   const [generatedMemeUrl, setGeneratedMemeUrl] = useState<string | null>(null)
-  const [animateCard, setAnimateCard] = useState<boolean>(false)
   const [animateButton, setAnimateButton] = useState<boolean>(false)
   const [animateReward, setAnimateReward] = useState<boolean>(false)
+
+  // Estado para la verificación de texto
+  const [isSubmittingText, setIsSubmittingText] = useState<boolean>(false)
+  const [textSubmitted, setTextSubmitted] = useState<boolean>(false)
 
   // State for verification methods
   const [photoData, setPhotoData] = useState<string | null>(null)
@@ -304,6 +329,7 @@ export function GroupChallengeFlow({ initialPlayers, cards, brandInfo, onComplet
     setAudioData(null)
     setGroupVotes([])
     setTextVerification("")
+    setTextSubmitted(false)
     resetChallenge()
     setIsInitialized(false)
     setSelectedPartner(null)
@@ -352,6 +378,7 @@ export function GroupChallengeFlow({ initialPlayers, cards, brandInfo, onComplet
       setAudioData(null)
       setGroupVotes([])
       setTextVerification("")
+      setTextSubmitted(false)
       resetChallenge()
       setIsInitialized(false)
       setSelectedPartner(null)
@@ -401,7 +428,7 @@ export function GroupChallengeFlow({ initialPlayers, cards, brandInfo, onComplet
       completeChallenge()
 
       // Reproducir sonido de completado
-      playSoundEffect("challenge_complete")
+      //playSoundEffect("challenge_complete")
 
       // Añadir animación
       setAnimateButton(true)
@@ -426,7 +453,7 @@ export function GroupChallengeFlow({ initialPlayers, cards, brandInfo, onComplet
       setVerificationError("Error al completar el reto. Por favor, intenta de nuevo.")
 
       // Reproducir sonido de error
-      playSoundEffect("error")
+      //playSoundEffect("error")
     }
   }
 
@@ -596,20 +623,29 @@ export function GroupChallengeFlow({ initialPlayers, cards, brandInfo, onComplet
       return
     }
 
+    setIsSubmittingText(true)
+
     try {
       // Simulate verification with text
+      await new Promise((resolve) => setTimeout(resolve, 1500)) // Simular tiempo de procesamiento
       const success = true // Always succeed for demo purposes
 
       if (success) {
+        setTextSubmitted(true)
         updatePlayerProgress("text")
         setShowConfetti(true)
         setTimeout(() => setShowConfetti(false), 3000)
-      }
 
-      setActiveTab("result")
+        // Esperar un momento antes de mostrar el resultado
+        setTimeout(() => {
+          setActiveTab("result")
+        }, 1000)
+      }
     } catch (err) {
       console.error("Error submitting text verification:", err)
       setVerificationError("Ocurrió un error al enviar la verificación. Por favor, intenta de nuevo.")
+    } finally {
+      setIsSubmittingText(false)
     }
   }
 
@@ -642,7 +678,7 @@ export function GroupChallengeFlow({ initialPlayers, cards, brandInfo, onComplet
     }
 
     // Reproducir sonido de voto
-    playSoundEffect("vote")
+    //playSoundEffect("vote")
 
     // Show toast notification
     const player = players.find((p) => p.id === playerId)
@@ -857,7 +893,7 @@ export function GroupChallengeFlow({ initialPlayers, cards, brandInfo, onComplet
       claimReward()
 
       // Reproducir sonido de recompensa
-      playSoundEffect("reward")
+      //playSoundEffect("reward")
 
       // Añadir animación
       setAnimateReward(true)
@@ -875,7 +911,7 @@ export function GroupChallengeFlow({ initialPlayers, cards, brandInfo, onComplet
       setVerificationError("Ocurrió un error al reclamar la recompensa. Por favor, intenta de nuevo.")
 
       // Reproducir sonido de error
-      playSoundEffect("error")
+      //playSoundEffect("error")
     }
   }
 
@@ -1233,21 +1269,39 @@ export function GroupChallengeFlow({ initialPlayers, cards, brandInfo, onComplet
             <h3 className="text-lg font-medium">Cuéntanos cómo completaste el reto</h3>
             <p className="text-sm text-gray-500">Describe brevemente cómo realizaste el desafío.</p>
 
-            <Textarea
-              placeholder="Escribe aquí tu descripción..."
-              value={textVerification}
-              onChange={(e) => setTextVerification(e.target.value)}
-              className="min-h-[120px]"
-            />
+            <div className="relative">
+              <Textarea
+                placeholder="Escribe aquí tu descripción..."
+                value={textVerification}
+                onChange={(e) => setTextVerification(e.target.value)}
+                className="min-h-[120px] pr-12"
+                disabled={isSubmittingText || textSubmitted}
+              />
+              <Button
+                size="sm"
+                className="absolute bottom-2 right-2 rounded-full p-2"
+                onClick={submitTextVerification}
+                disabled={!textVerification.trim() || isSubmittingText || textSubmitted}
+              >
+                {isSubmittingText ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+              </Button>
+            </div>
 
-            <Button
-              onClick={submitTextVerification}
-              className="w-full bg-gradient-to-r from-blue-500 to-teal-500 hover:opacity-90"
-              disabled={!textVerification.trim()}
-            >
-              <CheckCircle className="mr-2 h-4 w-4" />
-              Enviar Verificación
-            </Button>
+            {textSubmitted ? (
+              <div className="bg-green-50 p-4 rounded-lg border border-green-200 mt-4">
+                <div className="flex items-center">
+                  <CheckCircle className="h-5 w-5 text-green-500 mr-2" />
+                  <p className="text-green-700 font-medium">¡Verificación enviada con éxito!</p>
+                </div>
+                <p className="text-sm text-green-600 mt-1">
+                  Tu descripción ha sido recibida. Avanzando al siguiente paso...
+                </p>
+              </div>
+            ) : (
+              <div className="flex justify-center">
+                <p className="text-xs text-muted-foreground">Escribe tu respuesta y presiona el botón de enviar</p>
+              </div>
+            )}
           </div>
         )
     }
@@ -1325,7 +1379,6 @@ export function GroupChallengeFlow({ initialPlayers, cards, brandInfo, onComplet
             onClick={() => {
               setMemeGeneratorText(textVerification || "¡He completado el reto!")
               setShowMemeGenerator(true)
-              playSoundEffect("click")
             }}
             variant="outline"
             className="w-full flex items-center justify-center gap-2 mb-2"
@@ -1373,7 +1426,7 @@ export function GroupChallengeFlow({ initialPlayers, cards, brandInfo, onComplet
     }
   }
 
-  const handleMemeGenerated = (url: string | null) => {
+  const handleMemeGenerated = (url: string) => {
     setGeneratedMemeUrl(url)
   }
 
@@ -1402,7 +1455,6 @@ export function GroupChallengeFlow({ initialPlayers, cards, brandInfo, onComplet
           <span className="hidden sm:inline">Ver Recompensas</span>
           <span className="sm:hidden">Recompensas</span>
         </Button>
-        <SoundControls className="ml-2" />
       </div>
 
       {/* Sidebar with player info and brand details */}
@@ -1709,7 +1761,7 @@ export function GroupChallengeFlow({ initialPlayers, cards, brandInfo, onComplet
               <div className="bg-gradient-to-r from-purple-50 to-pink-50 p-4 rounded-lg border border-purple-200 mb-4">
                 <h4 className="font-medium mb-2">Stickers necesarios:</h4>
                 <div className="flex flex-wrap gap-2">
-                  {unlockedCombo.stickers_necesarios.map((sticker) => (
+                  {unlockedCombo.stickers_necesarios.map((sticker: string) => (
                     <Badge key={sticker} className="bg-white text-purple-700 border border-purple-200 py-1 px-2">
                       {sticker}
                     </Badge>
