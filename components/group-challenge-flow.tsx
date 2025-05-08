@@ -61,6 +61,9 @@ import { getComboByStickers } from "@/lib/card-models"
 // Importar los nuevos componentes
 import { MemeGenerator } from "./meme-generator"
 
+// Importar el servicio de analytics
+import { wrappedAnalytics, EventType } from "@/services/wrapped-analytics"
+
 // New typed interfaces for our challenge system
 interface Player {
   id: string
@@ -727,6 +730,13 @@ export function GroupChallengeFlow({ initialPlayers, cards, brandInfo, onComplet
         updatePlayerProgress("group")
         setShowConfetti(true)
         setTimeout(() => setShowConfetti(false), 3000)
+
+        wrappedAnalytics.trackEvent(EventType.GROUP_CHALLENGE_COMPLETED, currentPlayer.id, {
+          card: currentCard,
+          votes: positiveVotes,
+          threshold,
+          participants: Object.keys(groupParticipation).filter((id) => groupParticipation[id]),
+        })
       } else {
         // Failed verification
         toast({
@@ -816,6 +826,11 @@ export function GroupChallengeFlow({ initialPlayers, cards, brandInfo, onComplet
               description: `Has conseguido el sticker ${stickerMatch[1]} ${stickerType}`,
               duration: 3000,
             })
+
+            wrappedAnalytics.trackEvent(EventType.STICKER_UNLOCKED, currentPlayer.id, {
+              sticker: stickerType,
+              card: currentCard,
+            })
           }
         }
       }
@@ -828,6 +843,11 @@ export function GroupChallengeFlow({ initialPlayers, cards, brandInfo, onComplet
         updatedCombos.push(combo.nombre_combo)
         setUnlockedCombo(combo)
         setShowStickerCombo(true)
+
+        wrappedAnalytics.trackEvent(EventType.COMBO_UNLOCKED, currentPlayer.id, {
+          combo,
+          stickers: updatedStickers,
+        })
       }
 
       // Update the current player
@@ -883,6 +903,13 @@ export function GroupChallengeFlow({ initialPlayers, cards, brandInfo, onComplet
         })
       }
 
+      wrappedAnalytics.trackEvent(EventType.CARD_COMPLETED, currentPlayer.id, {
+        card: currentCard,
+        emotionalIntensity,
+        verificationType,
+        success: true,
+      })
+
       return updatedPlayers
     })
   }
@@ -899,11 +926,25 @@ export function GroupChallengeFlow({ initialPlayers, cards, brandInfo, onComplet
       setAnimateReward(true)
       setTimeout(() => setAnimateReward(false), 800)
 
-      // Mostrar generador de memes si es apropiado
-      if (challengeType === "individual" || challengeType === "duet") {
-        setMemeGeneratorText(textVerification || "¡He completado el reto!")
-        setShowMemeGenerator(true)
-      }
+      // Ya no abrimos automáticamente el generador de memes
+      // En su lugar, mostramos un toast con opción para crear meme
+      toast({
+        title: "¡Recompensa reclamada!",
+        description: "¿Quieres crear un meme para compartir tu logro?",
+        action: (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              setMemeGeneratorText(textVerification || "¡He completado el reto!")
+              setShowMemeGenerator(true)
+            }}
+          >
+            Crear Meme
+          </Button>
+        ),
+        duration: 5000,
+      })
 
       moveToNextPlayer("completed")
     } catch (err) {
@@ -1428,6 +1469,21 @@ export function GroupChallengeFlow({ initialPlayers, cards, brandInfo, onComplet
 
   const handleMemeGenerated = (url: string) => {
     setGeneratedMemeUrl(url)
+
+    wrappedAnalytics.trackEvent(EventType.MEME_GENERATED, currentPlayer.id, {
+      card: currentCard,
+      url: url,
+    })
+  }
+
+  // Añadir una función para rastrear cuando se comparte un meme:
+  const handleShareMeme = (url: string) => {
+    wrappedAnalytics.trackEvent(EventType.MEME_SHARED, currentPlayer.id, {
+      url,
+      platform: "social_media",
+    })
+
+    // Lógica de compartir existente...
   }
 
   return (
@@ -1973,6 +2029,10 @@ export function GroupChallengeFlow({ initialPlayers, cards, brandInfo, onComplet
       {showMemeGenerator && (
         <Dialog open={showMemeGenerator} onOpenChange={setShowMemeGenerator}>
           <DialogContent className="max-w-4xl">
+            <DialogHeader>
+              <DialogTitle>Generador de Memes</DialogTitle>
+              <DialogDescription>Crea un meme para compartir tu experiencia</DialogDescription>
+            </DialogHeader>
             <MemeGenerator
               initialText={memeGeneratorText}
               initialCategory={
@@ -1985,6 +2045,11 @@ export function GroupChallengeFlow({ initialPlayers, cards, brandInfo, onComplet
               onMemeGenerated={handleMemeGenerated}
               onClose={() => setShowMemeGenerator(false)}
             />
+            <DialogFooter className="mt-4">
+              <Button variant="outline" onClick={() => setShowMemeGenerator(false)} className="w-full">
+                Cerrar y Continuar
+              </Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
       )}

@@ -362,7 +362,7 @@ export function MemeGenerator({
       </div>
 
       <DialogFooter className="mt-4">
-        <Button variant="outline" onClick={onClose}>
+        <Button variant="outline" onClick={onClose} className="w-full">
           Cerrar
         </Button>
       </DialogFooter>

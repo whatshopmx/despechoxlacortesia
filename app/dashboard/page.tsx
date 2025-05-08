@@ -1,206 +1,200 @@
-import type React from "react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { BarChart3, Users, QrCode, TrendingUp, Calendar, SparklesIcon } from "lucide-react"
+"use client"
+
+import { useState } from "react"
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { useRouter } from "next/navigation"
 import Link from "next/link"
+import { BarChart3, QrCode, Users, Building2, Sparkles, Zap, Calendar, Award } from "lucide-react"
 
 export default function DashboardPage() {
-  return (
-    <div className="flex-1 space-y-4 p-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-3xl font-bold tracking-tight">Dashboard</h2>
-        <div className="flex items-center gap-2">
-          <div className="text-sm text-muted-foreground">Last updated: {new Date().toLocaleDateString()}</div>
-        </div>
-      </div>
+  const router = useRouter()
+  const [activeTab, setActiveTab] = useState("overview")
 
-      <Tabs defaultValue="overview" className="space-y-4">
+  return (
+    <div className="container mx-auto py-8">
+      <h1 className="text-3xl font-bold mb-6">Dashboard</h1>
+
+      <Tabs defaultValue={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList>
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="analytics">Analytics</TabsTrigger>
-          <TabsTrigger value="campaigns">Campaigns</TabsTrigger>
+          <TabsTrigger value="overview">Vista General</TabsTrigger>
+          <TabsTrigger value="tools">Herramientas</TabsTrigger>
+          <TabsTrigger value="analytics">Analíticas</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Campaigns</CardTitle>
-                <ShoppingBag className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">3</div>
-                <p className="text-xs text-muted-foreground">+2 from last month</p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Active Users</CardTitle>
-                <Users className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">+573</div>
-                <p className="text-xs text-muted-foreground">+201 from last month</p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">QR Scans</CardTitle>
+                <CardTitle className="text-sm font-medium">QR Codes</CardTitle>
                 <QrCode className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">1,324</div>
-                <p className="text-xs text-muted-foreground">+18% from last month</p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Rewards Claimed</CardTitle>
-                <TrendingUp className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">432</div>
-                <p className="text-xs text-muted-foreground">+24% from last month</p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Card Preview Generator</CardTitle>
-                <div className="h-4 w-4 text-muted-foreground">
-                  <SparklesIcon className="h-4 w-4" />
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">Brinda X</div>
-                <p className="text-xs text-muted-foreground">Preview and generate emotional cards</p>
+                <div className="text-2xl font-bold">12</div>
+                <p className="text-xs text-muted-foreground">Códigos QR activos</p>
               </CardContent>
               <CardFooter>
-                <Link href="/dashboard/card-preview" className="w-full">
-                  <Button className="w-full">Open Generator</Button>
-                </Link>
+                <Button variant="outline" size="sm" className="w-full" asChild>
+                  <Link href="/dashboard/qr-codes">Ver Códigos QR</Link>
+                </Button>
+              </CardFooter>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Clientes</CardTitle>
+                <Users className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">342</div>
+                <p className="text-xs text-muted-foreground">Clientes registrados</p>
+              </CardContent>
+              <CardFooter>
+                <Button variant="outline" size="sm" className="w-full" asChild>
+                  <Link href="/dashboard/customers">Ver Clientes</Link>
+                </Button>
+              </CardFooter>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Venues</CardTitle>
+                <Building2 className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">8</div>
+                <p className="text-xs text-muted-foreground">Venues activos</p>
+              </CardContent>
+              <CardFooter>
+                <Button variant="outline" size="sm" className="w-full" asChild>
+                  <Link href="/dashboard/venues">Ver Venues</Link>
+                </Button>
               </CardFooter>
             </Card>
           </div>
 
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-            <Card className="col-span-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Card>
               <CardHeader>
-                <CardTitle>Campaign Performance</CardTitle>
-              </CardHeader>
-              <CardContent className="pl-2">
-                <div className="h-[200px] w-full bg-muted rounded-md flex items-center justify-center">
-                  <BarChart3 className="h-8 w-8 text-muted-foreground" />
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="col-span-3">
-              <CardHeader>
-                <CardTitle>Recent Activity</CardTitle>
-                <CardDescription>Latest user interactions</CardDescription>
+                <CardTitle>Campañas de Marca</CardTitle>
+                <CardDescription>Gestiona tus campañas de marca</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  {[1, 2, 3, 4].map((i) => (
-                    <div key={i} className="flex items-center gap-4">
-                      <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center">
-                        <Users className="h-5 w-5 text-primary" />
-                      </div>
-                      <div className="space-y-1">
-                        <p className="text-sm font-medium leading-none">User claimed a reward</p>
-                        <p className="text-xs text-muted-foreground">
-                          {new Date(Date.now() - i * 3600000).toLocaleTimeString()}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                <p>Tienes 3 campañas activas y 2 pendientes de aprobación.</p>
               </CardContent>
+              <CardFooter>
+                <Button className="w-full" asChild>
+                  <Link href="/dashboard/brand-campaigns">Ver Campañas</Link>
+                </Button>
+              </CardFooter>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Analíticas</CardTitle>
+                <CardDescription>Visualiza el rendimiento de tus campañas</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <p>Obtén insights sobre el engagement y conversión de tus campañas.</p>
+              </CardContent>
+              <CardFooter>
+                <Button className="w-full" asChild>
+                  <Link href="/dashboard/analytics">Ver Analíticas</Link>
+                </Button>
+              </CardFooter>
             </Card>
           </div>
         </TabsContent>
 
-        <TabsContent value="analytics" className="space-y-4">
-          <Card className="col-span-4">
+        <TabsContent value="tools" className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Generador de Cartas</CardTitle>
+                <Sparkles className="h-4 w-4 text-purple-500" />
+              </CardHeader>
+              <CardContent>
+                <p className="text-xs text-muted-foreground">
+                  Crea cartas personalizadas con el motor emocional Brinda
+                </p>
+              </CardContent>
+              <CardFooter>
+                <Button variant="outline" size="sm" className="w-full" asChild>
+                  <Link href="/dashboard/card-preview">Crear Cartas</Link>
+                </Button>
+              </CardFooter>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Generador de Retos</CardTitle>
+                <Zap className="h-4 w-4 text-amber-500" />
+              </CardHeader>
+              <CardContent>
+                <p className="text-xs text-muted-foreground">
+                  Crea retos personalizados combinando diferentes categorías
+                </p>
+              </CardContent>
+              <CardFooter>
+                <Button variant="outline" size="sm" className="w-full" asChild>
+                  <Link href="/challenge-generator">Crear Retos</Link>
+                </Button>
+              </CardFooter>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Mi Wrapped</CardTitle>
+                <Award className="h-4 w-4 text-pink-500" />
+              </CardHeader>
+              <CardContent>
+                <p className="text-xs text-muted-foreground">Visualiza tu resumen personalizado de La Cortesía</p>
+              </CardContent>
+              <CardFooter>
+                <Button variant="outline" size="sm" className="w-full" asChild>
+                  <Link href="/wrapped">Ver Mi Wrapped</Link>
+                </Button>
+              </CardFooter>
+            </Card>
+          </div>
+
+          <Card>
             <CardHeader>
-              <CardTitle>Analytics Overview</CardTitle>
-              <CardDescription>Detailed metrics for all campaigns</CardDescription>
+              <CardTitle>Calendario de Eventos</CardTitle>
+              <CardDescription>Gestiona tus próximos eventos</CardDescription>
             </CardHeader>
-            <CardContent className="pl-2">
-              <div className="h-[300px] w-full bg-muted rounded-md flex items-center justify-center">
-                <BarChart3 className="h-8 w-8 text-muted-foreground" />
-              </div>
+            <CardContent>
+              <p>Tienes 2 eventos programados para esta semana.</p>
             </CardContent>
+            <CardFooter>
+              <Button className="w-full" asChild>
+                <Link href="/dashboard/events">
+                  <Calendar className="mr-2 h-4 w-4" />
+                  Ver Calendario
+                </Link>
+              </Button>
+            </CardFooter>
           </Card>
         </TabsContent>
 
-        <TabsContent value="campaigns" className="space-y-4">
+        <TabsContent value="analytics" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Campaign Calendar</CardTitle>
-              <CardDescription>Upcoming and active campaigns</CardDescription>
+              <CardTitle>Analíticas de Campañas</CardTitle>
+              <CardDescription>Visualiza el rendimiento de tus campañas</CardDescription>
             </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {[
-                  { name: "Don Julio - Despecho de Verano", date: "Jun 1 - Aug 31, 2025", status: "active" },
-                  { name: "Spotify - Playlist del Despecho", date: "May 15 - Jul 15, 2025", status: "active" },
-                  { name: "Uber Eats - Despecho Post-Bailazo", date: "Sep 1 - Nov 30, 2025", status: "upcoming" },
-                ].map((campaign, i) => (
-                  <div key={i} className="flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                      <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center">
-                        <Calendar className="h-5 w-5 text-primary" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium">{campaign.name}</p>
-                        <p className="text-xs text-muted-foreground">{campaign.date}</p>
-                      </div>
-                    </div>
-                    <div>
-                      <div
-                        className={`px-2 py-1 rounded-full text-xs ${
-                          campaign.status === "active"
-                            ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300"
-                            : "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300"
-                        }`}
-                      >
-                        {campaign.status === "active" ? "Active" : "Upcoming"}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
+            <CardContent className="h-[300px] flex items-center justify-center">
+              <BarChart3 className="h-16 w-16 text-muted-foreground" />
             </CardContent>
+            <CardFooter>
+              <Button className="w-full" asChild>
+                <Link href="/dashboard/analytics">Ver Detalles</Link>
+              </Button>
+            </CardFooter>
           </Card>
         </TabsContent>
       </Tabs>
     </div>
-  )
-}
-
-function ShoppingBag(props: React.SVGProps<SVGSVGElement>) {
-  return (
-    <svg
-      {...props}
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z" />
-      <path d="M3 6h18" />
-      <path d="M16 10a4 4 0 0 1-8 0" />
-    </svg>
   )
 }
